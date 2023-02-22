@@ -2,6 +2,7 @@ import elastix
 import os
 import SimpleITK as sitk
 import matplotlib.pyplot as plt
+from IndexTracker import IndexTracker
 
 ELASTIX_PATH = os.path.abspath("elastix/elastix.exe")
 if not os.path.exists(ELASTIX_PATH):
@@ -18,14 +19,17 @@ if os.path.exists(os.path.abspath("Project/results")) is False:
 
 patients = os.listdir(os.path.join("Project/Data"))
 
+dice_scores = {}
+
 for patient in patients:
-    if patient[0] == "p" and patient != "p135":
-        fixed_image = os.path.join("Project/Data", "p135", "mr_bffe.mhd")
-        fixed_label = os.path.join("Project/Data", "p135", "prostaat.mhd")
+    if patient[0] == "p" and patient != "p102":
+        fixed_image = os.path.join("Project/Data", "p102", "mr_bffe.mhd")
+        fixed_label = os.path.join("Project/Data", "p102", "prostaat.mhd")
         moving_image = os.path.join("Project/Data", patient, "mr_bffe.mhd")
         moving_label = os.path.join("Project/Data", patient, "prostaat.mhd")
 
-        parameters = os.path.join("Project/CapitaSelectaCode/PAR0001bspline64.txt")
+        parameter0 = os.path.join("Project/CapitaSelectaCode/Registration/Par0001translation.txt")
+        parameter1 = os.path.join("Project/CapitaSelectaCode/Registration/Par0001bspline64.txt")
         
         if os.path.exists(os.path.abspath(f"Project/results/{patient}")) is False:
             os.mkdir(os.path.abspath(f"Project/results/{patient}"))
@@ -33,7 +37,7 @@ for patient in patients:
         el.register(
             fixed_image=fixed_image,
             moving_image=moving_image,
-            parameters=[parameters],
+            parameters=[parameter0, parameter1],
             output_dir=os.path.abspath(f"Project/results/{patient}")
         )
 
@@ -53,18 +57,43 @@ for patient in patients:
         fixed_label = sitk.GetArrayFromImage(sitk.ReadImage(fixed_label))
         transformed_moving_image = sitk.GetArrayFromImage(sitk.ReadImage(os.path.join("Project/results/", patient, "mr_bffe", "result.mhd")))
         transformed_moving_label = sitk.GetArrayFromImage(sitk.ReadImage(os.path.join("Project/results/", patient, "prostaat", "result.mhd")))
+        
+        TP = 0
+        FP = 0
+        TN = 0
+        FN = 0
+        for slice in range(fixed_label.shape[0]):
+            for y in range(fixed_label.shape[1]):
+                for x in range(fixed_label.shape[2]):
+                    if transformed_moving_label[slice, y, x]==1 and fixed_label[slice, y, x]==1:
+                        TP += 1
+                    elif transformed_moving_label[slice, y, x]==0 and fixed_label[slice, y, x]==0:
+                        TN +=1
+                    elif transformed_moving_label[slice, y, x]==1 and fixed_label[slice, y, x]==0:
+                        FP += 1
+                    elif transformed_moving_label[slice, y, x]==0 and fixed_label[slice, y, x]==1:
+                        FN +=1
+
+        dice_score = 2*TP / ((TP + FP) + (TP + FN))
+        print(dice_score)
+        dice_scores[patient] = dice_score
 
         fig, ax = plt.subplots(1, 4, figsize=(20, 5))
-        ax[0].imshow(fixed_image[43, :, :], cmap='gray')
+
+        tracker1 = IndexTracker(ax[0], fixed_image)
+        tracker2 = IndexTracker(ax[1], fixed_label)
+        tracker3 = IndexTracker(ax[2], transformed_moving_image)
+        tracker4 = IndexTracker(ax[3], transformed_moving_label)
+        fig.canvas.mpl_connect('scroll_event', tracker1.onscroll)
+        fig.canvas.mpl_connect('scroll_event', tracker2.onscroll)
+        fig.canvas.mpl_connect('scroll_event', tracker3.onscroll)
+        fig.canvas.mpl_connect('scroll_event', tracker4.onscroll)
         ax[0].set_title('Fixed image')
-        ax[1].imshow(fixed_label[43, :, :], cmap='gray')
         ax[1].set_title('Fixed label')
-        ax[2].imshow(transformed_moving_image[43, :, :], cmap='gray')
         ax[2].set_title('Transformed\nmoving image')
-        ax[3].imshow(transformed_moving_label[43, :, :], cmap='gray')
         ax[3].set_title('Transformed\nmoving label')
         [x.set_axis_off() for x in ax]
         plt.show()
 
-        break
+print(dice_scores)
 
