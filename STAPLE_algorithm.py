@@ -24,7 +24,7 @@ masks_dir = Path(r"C:\Users\20182371\Documents\TUe\8DM20_CS_Medical_Imaging\Trai
 segmentations = [x for x in masks_dir.glob("*.mhd")]
 
 seg_stack = []
-STAPLE_3D_seg = np.zeros((333, 271, 85))
+STAPLE_3D_seg = np.zeros((333, 271,85))
 
 for i in range(0, 85):
     for seg in segmentations:
@@ -38,10 +38,14 @@ for i in range(0, 85):
     STAPLE_3D_seg[:, :, i] = STAPLE_seg
 
 #STAPLE_3D_seg = np.stack(image_stack, axis=0)
+STAPLE_3D_seg = np.where(STAPLE_3D_seg > 0.5, 1, 0)
+STAPLE_3D_seg = np.nan_to_num(STAPLE_3D_seg, nan=0)
+
 print(STAPLE_3D_seg.shape)
-plt.imshow(STAPLE_3D_seg[50,:,:])
+plt.imshow(STAPLE_3D_seg[:,:,i])
 
-
+unique_values = np.unique(STAPLE_3D_seg)
+print(unique_values)
 
 
 
