@@ -39,21 +39,52 @@ def staple(data_path, fixed_patient):
 
     for i in range(0, 85):
         for patient in patients:
-            seg_path = os.path.join(result_dir, patient, "prostaat", "result.mhd" )
-            image = sitk.ReadImage(str(seg_path))
-            image_array = sitk.GetArrayFromImage(image)
-            seg_sitk = sitk.GetImageFromArray(image_array[i,:,:].astype(np.int16))
-            seg_stack.append(seg_sitk)
+            if patient[0] == "p" and patient != fixed_patient:
+                seg_path = os.path.join(result_dir, patient, "prostaat", "result.mhd" )
+                image = sitk.ReadImage(str(seg_path))
+                image_array = sitk.GetArrayFromImage(image)
+                seg_sitk = sitk.GetImageFromArray(image_array[i,:,:].astype(np.int16))
+                seg_stack.append(seg_sitk)
         
         STAPLE_seg_sitk = sitk.STAPLE(seg_stack, 1.0 )
         STAPLE_seg = sitk.GetArrayFromImage(STAPLE_seg_sitk)
         STAPLE_3D_seg[i, :, :] = STAPLE_seg
 
     #STAPLE_3D_seg = np.stack(image_stack, axis=0)
-    STAPLE_3D_seg = np.where(STAPLE_3D_seg > 0.5, 1, 0)
+    STAPLE_3D_seg = np.where(STAPLE_3D_seg > 0.95, 1, 0)
     STAPLE_3D_seg = np.nan_to_num(STAPLE_3D_seg, nan=0)
     
     return STAPLE_3D_seg
+
+def staple_3D(data_path, fixed_patient):
+    
+    result_dir = os.path.join(data_path, "results", fixed_patient)
+    if os.path.exists(result_dir) is False:
+        raise IOError('results cannot be found')
+    
+    patients = os.listdir(result_dir)
+
+    seg_stack = []
+
+    for patient in patients:
+        if patient[0] == "p" and patient != fixed_patient:
+            seg_path = os.path.join(result_dir, patient, "prostaat", "result.mhd" )
+            image = sitk.ReadImage(str(seg_path))
+            image_array = sitk.GetArrayFromImage(image)
+            seg_sitk = sitk.GetImageFromArray(image_array.astype(np.int16))
+            seg_stack.append(seg_sitk)
+        
+        
+    STAPLE_seg_sitk = sitk.STAPLE(seg_stack, 1.0 )
+    STAPLE_seg = sitk.GetArrayFromImage(STAPLE_seg_sitk)
+
+    #STAPLE_3D_seg = np.stack(image_stack, axis=0)
+    STAPLE_seg = np.where(STAPLE_seg > 0.95, 1, 0)
+    STAPLE_seg = np.nan_to_num(STAPLE_seg, nan=0)
+    
+    #sitk.WriteImage(STAPLE_seg, os.path.join(result_dir, "STAPLE_seg.nii"))
+    
+    return STAPLE_seg
 
 def registration_transformation(elastix_path, data_path, fixed_patient, show_results = False):
     """ This function registrates all the images in de datapath that are not the fixed 
@@ -98,7 +129,7 @@ def registration_transformation(elastix_path, data_path, fixed_patient, show_res
                 output_dir=output_dir
             )
             
-            t_params = os.path.join(output_dir, "TransformParameters.0.txt")
+            t_params = os.path.join(output_dir, "TransformParameters.1.txt")
             
             with open(t_params, 'r') as file:
                 lines = file.readlines()
@@ -272,11 +303,12 @@ def calc_dice_scores(data_path, fixed_patient, staple_label):
     patients = os.listdir(result_dir)
     
     for patient in patients:
-        seg_path = os.path.join(result_dir, patient, "prostaat", "result.mhd" )
-        image = sitk.ReadImage(str(seg_path))
-        moving_label = sitk.GetArrayFromImage(image)
-        dice = dice_score(fixed_label, moving_label)
-        df_scores.loc[patient] = [dice]
+        if patient[0] == "p" and patient != fixed_patient:
+            seg_path = os.path.join(result_dir, patient, "prostaat", "result.mhd" )
+            image = sitk.ReadImage(str(seg_path))
+            moving_label = sitk.GetArrayFromImage(image)
+            dice = dice_score(fixed_label, moving_label)
+            df_scores.loc[patient] = [dice]
     
     staple_dice = dice_score(fixed_label, staple_label)
     df_scores.loc["STAPLE"] = [staple_dice]
@@ -295,24 +327,24 @@ if __name__ == "__main__":
     
     #registration_transformation(elastix_path, data_path, fixed_patient, True)
     
-    #staple_label = staple(data_path, fixed_patient)
+    staple_label = staple(data_path, fixed_patient)
     
-    #fixed_patient_path = os.path.join(data_path, fixed_patient, "prostaat.mhd")
-    #image = sitk.ReadImage(str(fixed_patient_path))
-    #fixed_label = sitk.GetArrayFromImage(image)
+    fixed_patient_path = os.path.join(data_path, fixed_patient, "prostaat.mhd")
+    image = sitk.ReadImage(str(fixed_patient_path))
+    fixed_label = sitk.GetArrayFromImage(image)
     
-    #fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    #fig.suptitle(f'Fixed and staple, Slice {slice_number}', fontsize=24)
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    fig.suptitle(f'Fixed and staple, Slice {slice_number}', fontsize=24)
     
-    #ax[0].imshow(fixed_label[slice_number,:,:])
-    #ax[0].set_title(f'Fixed label {fixed_patient}')
-    #ax[0].set_axis_off()
+    ax[0].imshow(fixed_label[slice_number,:,:])
+    ax[0].set_title(f'Fixed label {fixed_patient}')
+    ax[0].set_axis_off()
     
-    #ax[1].imshow(staple_label[slice_number,:,:])
-    #ax[1].set_title("STAPLE label")
-    #ax[1].set_axis_off()
+    ax[1].imshow(staple_label[slice_number,:,:])
+    ax[1].set_title("STAPLE label")
+    ax[1].set_axis_off()
 
     #calc_dice_scores(data_path,fixed_patient, staple_label)
     
     #plot_transformed_labels(data_path, fixed_patient, slice_number)
-    plot_labels(data_path, fixed_patient, slice_number)
+    #plot_labels(data_path, fixed_patient, slice_number)
