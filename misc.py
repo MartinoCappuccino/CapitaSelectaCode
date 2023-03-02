@@ -15,7 +15,7 @@ class Config():
             self, 
             folder_raw : str, 
             folder_preprocessed : str,
-            folder_parameters : str,
+            folder_parameter_groups : str,
             folder_results : str,
             seed = 0,
             train_size = 12,
@@ -24,12 +24,12 @@ class Config():
         ):
             assert os.path.exists(folder_raw)
             assert os.path.exists(folder_preprocessed)
-            assert os.path.exists(folder_parameters)
+            assert os.path.exists(folder_parameter_groups)
             assert os.path.exists(folder_results)
 
             self.__folder_raw = folder_raw
             self.__folder_preprocessed = folder_preprocessed
-            self.__folder_parameters = folder_parameters
+            self.__folder_parameter_groups = folder_parameter_groups
             self.__folder_results = folder_results
             self.__basepaths = list(sorted(filter(_is_valid_name, os.listdir(self.folder_raw))))
             self.__fullpaths_raw = list(map(lambda path : os.path.join(self.folder_raw, path), self.basepaths))
@@ -42,14 +42,22 @@ class Config():
                     os.mkdir(path)
             self.set_train_valid_indx(seed, train_size, train_indx, valid_indx)
 
-            self.__basepaths_parameters = list(sorted(os.listdir(self.folder_parameters)))
-            self.__fullpaths_parameters = list(map(
-                lambda path : os.path.join(self.folder_parameters, path),
-                self.basepaths_parameters,
+            self.__basepaths_parameter_groups = list(sorted(os.listdir(self.folder_parameter_groups)))
+            self.__fullpaths_parameter_groups = list(map(
+                lambda path : os.path.join(self.folder_parameter_groups, path),
+                self.basepaths_parameter_groups,
             ))
-            for path_parameters in self.basepaths_parameters:
-                assert path_parameters[-4:] == ".txt"
-                temp_1 = os.path.join(self.folder_results, path_parameters[:-4])
+
+            self.__basepaths_parameters_per_group = []
+            self.__fullpaths_parameters_per_group = []
+
+            for i in range(len(self.basepaths_parameter_groups)):
+                path_parameter_group = self.basepaths_parameter_groups[i]
+                fullpath_parameter_group = self.fullpaths_parameter_groups[i]
+                if not os.path.isdir(fullpath_parameter_group):
+                    continue
+                # Creating results folders
+                temp_1 = os.path.join(self.folder_results, path_parameter_group)
                 if not os.path.exists(temp_1):
                     os.mkdir(temp_1)
                 for path_valid in itemgetter(*[*self.valid_indx, 0])(self.basepaths)[:-1]:
@@ -60,6 +68,18 @@ class Config():
                         temp_3 = os.path.join(temp_2, path_train + "_as_moving")
                         if not os.path.exists(temp_3):
                             os.mkdir(temp_3)
+                # Storing parameter files per group (SORTED BY NAME)
+                paths_parameters = list(sorted(
+                    filter(
+                    lambda path : path[-4:] == ".txt", 
+                    os.listdir(fullpath_parameter_group))
+                ))
+                fullpaths_parameters = list(map(
+                    lambda path : os.path.join(fullpath_parameter_group, path),
+                    paths_parameters,
+                ))
+                self.basepaths_parameters_per_group.append(paths_parameters)
+                self.fullpaths_parameters_per_group.append(fullpaths_parameters)
 
     def __len__(self):
         return len(self.basepaths)
@@ -92,8 +112,8 @@ class Config():
         return self.__folder_preprocessed
     
     @property
-    def folder_parameters(self):
-        return self.__folder_parameters
+    def folder_parameter_groups(self):
+        return self.__folder_parameter_groups
     
     @property
     def folder_results(self):
@@ -112,13 +132,21 @@ class Config():
         return self.__fullpaths_preprocessed
     
     @property
-    def basepaths_parameters(self):
-        return self.__basepaths_parameters
+    def basepaths_parameter_groups(self):
+        return self.__basepaths_parameter_groups
     
     @property
-    def fullpaths_parameters(self):
-        return self.__fullpaths_parameters
+    def fullpaths_parameter_groups(self):
+        return self.__fullpaths_parameter_groups
     
+    @property
+    def basepaths_parameters_per_group(self):
+        return self.__basepaths_parameters_per_group
+    
+    @property
+    def fullpaths_parameters_per_group(self):
+        return self.__fullpaths_parameters_per_group
+
     @property
     def train_indx(self):
         return self.__train_indx
