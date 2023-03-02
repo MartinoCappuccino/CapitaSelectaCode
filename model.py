@@ -106,7 +106,7 @@ class Model():
             # depending on if we do 2 or 3 transformations subsequently, the name of the transformation files
             # should be TransformParameters.1.txt and TransformParameters.2.txt respectively
             
-            path_transform = os.path.join(output_dir, 'TransformParameters.1.txt')
+            path_transform = os.path.join(output_dir, 'TransformParameters.0.txt')
             with open(path_transform, 'r') as file:
                 filedata = file.read()
             # filedata = filedata.replace("(FinalBSplineInterpolationOrder 3)", "(FinalBSplineInterpolationOrder 0)")
