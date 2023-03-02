@@ -86,27 +86,27 @@ class Model():
         assert valid_i in self.config.valid_indx
         path_fixed = os.path.join(self.config.fullpaths_preprocessed[valid_i], "mr_bffe.mhd")
         path_fixed_mask = os.path.join(self.config.fullpaths_preprocessed[valid_i], "prostaat.mhd")
-        path_parameters = self.config.fullpaths_parameters[param_i]
+        parameters = self.config.fullpaths_parameters_per_group[param_i]
         for train_i in self.config.train_indx:
             path_moving = os.path.join(self.config.fullpaths_preprocessed[train_i], "mr_bffe.mhd")
             path_moving_mask = os.path.join(self.config.fullpaths_preprocessed[train_i], "prostaat.mhd")
             output_dir = os.path.join(
                 self.config.folder_results, 
-                self.config.basepaths_parameters[param_i][:-4],
+                self.config.basepaths_parameter_groups[param_i],
                 self.config.basepaths[valid_i] + "_as_fixed",
                 self.config.basepaths[train_i] + "_as_moving",
             )
             self.el.register(
                 fixed_image=path_fixed,
                 moving_image=path_moving,
-                parameters=[path_parameters],
+                parameters=parameters,
                 output_dir=output_dir,
             )
             
             # depending on if we do 2 or 3 transformations subsequently, the name of the transformation files
             # should be TransformParameters.1.txt and TransformParameters.2.txt respectively
             
-            path_transform = os.path.join(output_dir, 'TransformParameters.0.txt')
+            path_transform = os.path.join(output_dir, f'TransformParameters.{len(parameters)-1}.txt')
             with open(path_transform, 'r') as file:
                 filedata = file.read()
             # filedata = filedata.replace("(FinalBSplineInterpolationOrder 3)", "(FinalBSplineInterpolationOrder 0)")
@@ -118,8 +118,8 @@ class Model():
             tr.transform_image(path_moving_mask, output_dir=output_dir)
 
     def run_registration(self):
-        for param_i in range(len(self.config.fullpaths_parameters)):
-            print("Running with parameters", self.config.basepaths_parameters[param_i])
+        for param_i in range(len(self.config.fullpaths_parameter_groups)):
+            print("Running with parameters", self.config.basepaths_parameter_groups[param_i])
             for valid_i in tqdm(self.config.valid_indx):
                 self.register_and_segment(valid_i, param_i)
         
@@ -127,9 +127,9 @@ class Model():
         self.segmentations = []
         self.ground_truths = []
         self.scores = []
-        for path_parameters in self.config.basepaths_parameters:
-            print("Running for parameters", path_parameters)
-            temp_1 = os.path.join(self.config.folder_results, path_parameters[:-4])
+        for path_parameter_group in self.config.basepaths_parameter_groups:
+            print("Running for parameters", path_parameter_group)
+            temp_1 = os.path.join(self.config.folder_results, path_parameter_group)
             res_per_parameters = []
             scores_per_parameters = []
             for path_valid in tqdm(itemgetter(*[*self.config.valid_indx, 0])(self.config.basepaths)[:-1]):
