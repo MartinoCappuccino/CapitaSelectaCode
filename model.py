@@ -6,17 +6,16 @@ from misc import Config
 import numpy as np 
 from skimage.transform import downscale_local_mean
 import SimpleITK as sitk 
+from scipy.spatial.distance import directed_hausdorff
 # os.environ["PATH"] = "/Users/ivannovikov/Downloads/elastix-5.0.0-mac/bin" + os.pathsep + os.environ["PATH"]
 # os.environ["DYLD_LIBRARY_PATH"] = "/Users/ivannovikov/Downloads/elastix-5.0.0-mac/lib"
 import elastix
 from operator import itemgetter
 os.pathsep="/"
+import pandas as pd
 
 def dice_score(x, y, eps=1e-5):
-    return (2*(x*y).sum()) / ((x+y+eps).sum())
-
-def hausdorf_dist():
-    return
+    return (2*(x*y).sum()) / ((x+y).sum()+eps)
 
 class Model():
     def __init__(
@@ -42,7 +41,7 @@ class Model():
     @property
     def el(self):
         return self.__el
-
+    
     def load(self):
         mr_bffe = sitk.ReadImage(os.path.join(self.config.fullpaths_raw[0], "mr_bffe.mhd"))
         mr_bffe = sitk.GetArrayFromImage(mr_bffe)
@@ -89,7 +88,6 @@ class Model():
         assert valid_i in self.config.valid_indx
         path_fixed = os.path.join(self.config.fullpaths_preprocessed[valid_i], "mr_bffe.mhd")
         parameters = list(map( lambda path : os.path.join(self.config.parameter_folder, path), self.config.parameters))
-        print(parameters)
         for train_i in self.config.train_indx:
             path_moving = os.path.join(self.config.fullpaths_preprocessed[train_i], "mr_bffe.mhd")
             path_moving_mask = os.path.join(self.config.fullpaths_preprocessed[train_i], "prostaat.mhd")
@@ -115,7 +113,7 @@ class Model():
                 with open(path_transform, 'w') as file:
                     file.write(filedata)
 
-            tr = elastix.TransformixInterface(parameters=path_transform)
+            tr = elastix.TransformixInterface(parameters=path_transform, transformix_path=self.transformix_path)
             tr.transform_image(path_moving_mask, output_dir=output_dir)
 
     def run_registration(self):
@@ -123,33 +121,50 @@ class Model():
         for valid_i in tqdm(self.config.valid_indx):
             self.register_and_segment(valid_i)
         
-    def run_staple(self):
-        self.segmentations = []
-        self.ground_truths = []
-        self.scores = []
+    def calculate_scores(self):
+        self.segmentations = {}
+        self.ground_truths = {}
+        self.scores = {}
         print("Running for parameters", self.config.parameters)
-        temp_1 = os.path.join(self.config.folder_results)
-        res_per_parameters = []
-        scores_per_parameters = []
-        for path_valid in tqdm(itemgetter(*[*self.config.valid_indx, 0])(self.config.patients)[:-1]):
-            temp_2 = os.path.join(temp_1, path_valid + "_as_fixed")
-            ground_truth = sitk.ReadImage(os.path.join(self.config.folder_preprocessed, path_valid, "prostaat.mhd"))
+        for valid_i in tqdm(self.config.valid_indx):
+            ground_truth = sitk.ReadImage(os.path.join(self.config.folder_preprocessed, self.config.patients[valid_i], "prostaat.mhd"))
             ground_truth = sitk.GetArrayFromImage(ground_truth).astype(np.int16)
-            self.ground_truths.append(ground_truth)
+            self.ground_truths[self.config.patients[valid_i]] = ground_truth
             seg_stack = []
-            for path_train in itemgetter(*[*self.config.train_indx, 0])(self.config.basepaths)[:-1]: 
-                temp_3 = os.path.join(temp_2, path_train + "_as_moving")
-                segmentation = sitk.ReadImage(os.path.join(temp_3, "result.mhd"))
+            for train_i in self.config.train_indx:
+                segmentation = sitk.ReadImage(os.path.join(self.config.folder_results, self.config.now, self.config.patients[valid_i], self.config.patients[train_i], "result.mhd"))
                 segmentation = sitk.GetArrayFromImage(segmentation)
-                segmentation = np.nan_to_num(segmentation, nan=0)
+                segmentation = np.nan_to_num(segmentation)
                 segmentation = (segmentation > self.threshold).astype(np.int16)
-                segmentation = sitk.GetImageFromArray(segmentation)
-                seg_stack.append(segmentation)
+                
+                dice = dice_score(segmentation, ground_truth)
+
+                hausdorf = []
+                for slice in range(segmentation.shape[0]):
+                    hausdorf.append(directed_hausdorff(segmentation[slice, :, :], ground_truth[slice, :, :]))
+                hausdorf = np.array(hausdorf)
+                mean_hausdorf = hausdorf.mean()
+                std_hausdorf = hausdorf.std()
+                self.scores[self.config.patients[valid_i], self.config.patients[train_i]] = [dice, mean_hausdorf, std_hausdorf]
+
+                self.segmentations[self.config.patients[valid_i], self.config.patients[train_i]] = segmentation                
+                seg_stack.append(sitk.GetImageFromArray(segmentation))
+           
             staple = sitk.STAPLE(seg_stack, 1.0) 
             staple = sitk.GetArrayFromImage(staple)
-            res_per_parameters.append(staple)
             staple = (staple > self.threshold_staple).astype(np.int16)
-            score = dice_score(staple, ground_truth)
-            scores_per_parameters.append(score)
-        self.segmentations.append(res_per_parameters)
-        self.scores.append(scores_per_parameters)
+            
+            dice = dice_score(staple, ground_truth)
+            
+            hausdorf = []
+            for slice in range(staple.shape[0]):
+                hausdorf.append(directed_hausdorff(staple[slice, :, :], ground_truth[slice, :, :]))
+            hausdorf = np.array(hausdorf)
+            mean_hausdorf = hausdorf.mean()
+            std_hausdorf = hausdorf.std()
+            self.scores[self.config.patients[valid_i], "STAPLE", "hausdorf"] = [dice, mean_hausdorf, std_hausdorf]
+
+            csv = pd.DataFrame.from_dict(self.scores, columns=["Dice", "Mean Hausdorf", "STD Hausdorf"])
+            csv.to_csv(os.path.join(self.config.folder_results, self.config.now, self.config.patients[valid_i], "scores.csv"))
+
+            self.segmentations[self.config.patients[valid_i], "STAPLE"] = staple
