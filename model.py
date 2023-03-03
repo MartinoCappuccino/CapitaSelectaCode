@@ -1,5 +1,5 @@
 import os
-from tqdm.notebook import tqdm, trange
+from tqdm import tqdm
 from typing import List, Tuple, Any, Dict, Set, Optional
 from misc import Config
 
@@ -10,9 +10,13 @@ import SimpleITK as sitk
 # os.environ["DYLD_LIBRARY_PATH"] = "/Users/ivannovikov/Downloads/elastix-5.0.0-mac/lib"
 import elastix
 from operator import itemgetter
+os.pathsep="/"
 
 def dice_score(x, y, eps=1e-5):
     return (2*(x*y).sum()) / ((x+y+eps).sum())
+
+def hausdorf_dist():
+    return
 
 class Model():
     def __init__(
@@ -51,9 +55,9 @@ class Model():
             self.data[i,0] = mr_bffe
             self.data[i,1] = prostaat
 
-    def preprecess_and_save(
+    def preprocess_and_save(
         self,
-        downscale_factor : int = 4,
+        downscale_factor : int = 1,
         normalize : str = "none"
     ):
         self.data_preprocessed = downscale_local_mean(
@@ -81,21 +85,17 @@ class Model():
     def register_and_segment(
         self,
         valid_i : int,
-        param_i : int,
     ):
         assert valid_i in self.config.valid_indx
         path_fixed = os.path.join(self.config.fullpaths_preprocessed[valid_i], "mr_bffe.mhd")
-        path_fixed_mask = os.path.join(self.config.fullpaths_preprocessed[valid_i], "prostaat.mhd")
-        parameters = self.config.fullpaths_parameters_per_group[param_i]
+        parameters = list(map( lambda path : os.path.join(self.config.parameter_folder, path), self.config.parameters))
+        print(parameters)
         for train_i in self.config.train_indx:
             path_moving = os.path.join(self.config.fullpaths_preprocessed[train_i], "mr_bffe.mhd")
             path_moving_mask = os.path.join(self.config.fullpaths_preprocessed[train_i], "prostaat.mhd")
-            output_dir = os.path.join(
-                self.config.folder_results, 
-                self.config.basepaths_parameter_groups[param_i],
-                self.config.basepaths[valid_i] + "_as_fixed",
-                self.config.basepaths[train_i] + "_as_moving",
-            )
+
+            output_dir = os.path.join(self.config.folder_results, self.config.now, self.config.patients[valid_i], self.config.patients[train_i])
+
             self.el.register(
                 fixed_image=path_fixed,
                 moving_image=path_moving,
@@ -105,52 +105,51 @@ class Model():
             
             # depending on if we do 2 or 3 transformations subsequently, the name of the transformation files
             # should be TransformParameters.1.txt and TransformParameters.2.txt respectively
-            
-            path_transform = os.path.join(output_dir, f'TransformParameters.{len(parameters)-1}.txt')
-            with open(path_transform, 'r') as file:
-                filedata = file.read()
-            # filedata = filedata.replace("(FinalBSplineInterpolationOrder 3)", "(FinalBSplineInterpolationOrder 0)")
-            filedata = filedata.replace("(ResultImagePixelType \"short\")", "(ResultImagePixelType \"float\")")
-            with open(path_transform, 'w') as file:
-                file.write(filedata)
+            path_transform = str
+            for i in range(len(parameters)):   
+                path_transform = os.path.join(output_dir, f'TransformParameters.{i}.txt')
+                with open(path_transform, 'r') as file:
+                    filedata = file.read()
+                # filedata = filedata.replace("(FinalBSplineInterpolationOrder 3)", "(FinalBSplineInterpolationOrder 0)")
+                filedata = filedata.replace("(ResultImagePixelType \"short\")", "(ResultImagePixelType \"float\")")
+                with open(path_transform, 'w') as file:
+                    file.write(filedata)
 
             tr = elastix.TransformixInterface(parameters=path_transform)
             tr.transform_image(path_moving_mask, output_dir=output_dir)
 
     def run_registration(self):
-        for param_i in range(len(self.config.fullpaths_parameter_groups)):
-            print("Running with parameters", self.config.basepaths_parameter_groups[param_i])
-            for valid_i in tqdm(self.config.valid_indx):
-                self.register_and_segment(valid_i, param_i)
+        print("Running with parameters", self.config.parameters)
+        for valid_i in tqdm(self.config.valid_indx):
+            self.register_and_segment(valid_i)
         
     def run_staple(self):
         self.segmentations = []
         self.ground_truths = []
         self.scores = []
-        for path_parameter_group in self.config.basepaths_parameter_groups:
-            print("Running for parameters", path_parameter_group)
-            temp_1 = os.path.join(self.config.folder_results, path_parameter_group)
-            res_per_parameters = []
-            scores_per_parameters = []
-            for path_valid in tqdm(itemgetter(*[*self.config.valid_indx, 0])(self.config.basepaths)[:-1]):
-                temp_2 = os.path.join(temp_1, path_valid + "_as_fixed")
-                ground_truth = sitk.ReadImage(os.path.join(self.config.folder_preprocessed, path_valid, "prostaat.mhd"))
-                ground_truth = sitk.GetArrayFromImage(ground_truth).astype(np.int16)
-                self.ground_truths.append(ground_truth)
-                seg_stack = []
-                for path_train in itemgetter(*[*self.config.train_indx, 0])(self.config.basepaths)[:-1]: 
-                    temp_3 = os.path.join(temp_2, path_train + "_as_moving")
-                    segmentation = sitk.ReadImage(os.path.join(temp_3, "result.mhd"))
-                    segmentation = sitk.GetArrayFromImage(segmentation)
-                    segmentation = np.nan_to_num(segmentation, nan=0)
-                    segmentation = (segmentation > self.threshold).astype(np.int16)
-                    segmentation = sitk.GetImageFromArray(segmentation)
-                    seg_stack.append(segmentation)
-                staple = sitk.STAPLE(seg_stack, 1.0) 
-                staple = sitk.GetArrayFromImage(staple)
-                res_per_parameters.append(staple)
-                staple = (staple > self.threshold_staple).astype(np.int16)
-                score = dice_score(staple, ground_truth)
-                scores_per_parameters.append(score)
-            self.segmentations.append(res_per_parameters)
-            self.scores.append(scores_per_parameters)
+        print("Running for parameters", self.config.parameters)
+        temp_1 = os.path.join(self.config.folder_results)
+        res_per_parameters = []
+        scores_per_parameters = []
+        for path_valid in tqdm(itemgetter(*[*self.config.valid_indx, 0])(self.config.patients)[:-1]):
+            temp_2 = os.path.join(temp_1, path_valid + "_as_fixed")
+            ground_truth = sitk.ReadImage(os.path.join(self.config.folder_preprocessed, path_valid, "prostaat.mhd"))
+            ground_truth = sitk.GetArrayFromImage(ground_truth).astype(np.int16)
+            self.ground_truths.append(ground_truth)
+            seg_stack = []
+            for path_train in itemgetter(*[*self.config.train_indx, 0])(self.config.basepaths)[:-1]: 
+                temp_3 = os.path.join(temp_2, path_train + "_as_moving")
+                segmentation = sitk.ReadImage(os.path.join(temp_3, "result.mhd"))
+                segmentation = sitk.GetArrayFromImage(segmentation)
+                segmentation = np.nan_to_num(segmentation, nan=0)
+                segmentation = (segmentation > self.threshold).astype(np.int16)
+                segmentation = sitk.GetImageFromArray(segmentation)
+                seg_stack.append(segmentation)
+            staple = sitk.STAPLE(seg_stack, 1.0) 
+            staple = sitk.GetArrayFromImage(staple)
+            res_per_parameters.append(staple)
+            staple = (staple > self.threshold_staple).astype(np.int16)
+            score = dice_score(staple, ground_truth)
+            scores_per_parameters.append(score)
+        self.segmentations.append(res_per_parameters)
+        self.scores.append(scores_per_parameters)
