@@ -87,6 +87,7 @@ class Model():
     ):
         assert valid_i in self.config.valid_indx
         path_fixed = os.path.join(self.config.fullpaths_preprocessed[valid_i], "mr_bffe.mhd")
+        path_fixed_mask = os.path.join(self.config.fullpaths_preprocessed[valid_i], "prostaat.mhd")
         parameters = list(map( lambda path : os.path.join(self.config.parameter_folder, path), self.config.parameters))
         for train_i in self.config.train_indx:
             path_moving = os.path.join(self.config.fullpaths_preprocessed[train_i], "mr_bffe.mhd")
@@ -97,6 +98,8 @@ class Model():
             self.el.register(
                 fixed_image=path_fixed,
                 moving_image=path_moving,
+                # fixed_mask=path_fixed_mask,
+                # moving_mask=path_moving_mask,
                 parameters=parameters,
                 output_dir=output_dir,
             )
@@ -162,9 +165,11 @@ class Model():
             hausdorf = np.array(hausdorf)
             mean_hausdorf = hausdorf.mean()
             std_hausdorf = hausdorf.std()
-            self.scores[self.config.patients[valid_i], "STAPLE", "hausdorf"] = [dice, mean_hausdorf, std_hausdorf]
-
-            csv = pd.DataFrame.from_dict(self.scores, columns=["Dice", "Mean Hausdorf", "STD Hausdorf"])
-            csv.to_csv(os.path.join(self.config.folder_results, self.config.now, self.config.patients[valid_i], "scores.csv"))
+            self.scores[self.config.patients[valid_i], "STAPLE"] = [dice, mean_hausdorf, std_hausdorf]
 
             self.segmentations[self.config.patients[valid_i], "STAPLE"] = staple
+
+        csv = pd.DataFrame.from_dict(self.scores)
+        csv = csv.transpose()
+        csv.columns=["Dice Score", "Hausdorff distance mean", "Hausdorff distance std"]
+        csv.to_csv(os.path.join(self.config.folder_results, self.config.now, "scores.csv"))

@@ -60,10 +60,10 @@ class Config():
             for valid_i in self.valid_indx:
                 if not os.path.exists(os.path.join(folder_results, self.now, self.patients[valid_i])):
                     os.mkdir(os.path.join(self.folder_results, self.now, self.patients[valid_i]))
-                for patient in self.patients:
-                    if not os.path.exists(os.path.join(folder_results, self.now, self.patients[valid_i], patient)) and patient != self.patients[valid_i]:
-                        os.mkdir(os.path.join(self.folder_results, self.now, self.patients[valid_i], patient))
-                        self.fullpaths_results.append(os.path.join(self.folder_results, self.now, self.patients[valid_i], patient))
+                for train_i in self.train_indx:
+                    if not os.path.exists(os.path.join(folder_results, self.now, self.patients[valid_i], self.patients[train_i])):
+                        os.mkdir(os.path.join(self.folder_results, self.now, self.patients[valid_i], self.patients[train_i]))
+                        self.fullpaths_results.append(os.path.join(self.folder_results, self.now, self.patients[valid_i], self.patients[train_i]))
 
             # self.__basepaths_parameters_per_group = []
             # self.__fullpaths_parameters_per_group = []
