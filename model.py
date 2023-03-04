@@ -6,6 +6,8 @@ from misc import Config
 import numpy as np 
 from skimage.transform import downscale_local_mean
 import SimpleITK as sitk 
+from scipy.spatial.distance import directed_hausdorff
+
 # os.environ["PATH"] = "/Users/ivannovikov/Downloads/elastix-5.0.0-mac/bin" + os.pathsep + os.environ["PATH"]
 # os.environ["DYLD_LIBRARY_PATH"] = "/Users/ivannovikov/Downloads/elastix-5.0.0-mac/lib"
 import elastix
@@ -132,6 +134,7 @@ class Model():
             temp_1 = os.path.join(self.config.folder_results, path_parameter_group)
             res_per_parameters = []
             scores_per_parameters = []
+            hausdorff_per_parameters = []
             for path_valid in tqdm(itemgetter(*[*self.config.valid_indx, 0])(self.config.basepaths)[:-1]):
                 temp_2 = os.path.join(temp_1, path_valid + "_as_fixed")
                 ground_truth = sitk.ReadImage(os.path.join(self.config.folder_preprocessed, path_valid, "prostaat.mhd"))
@@ -142,7 +145,7 @@ class Model():
                     temp_3 = os.path.join(temp_2, path_train + "_as_moving")
                     segmentation = sitk.ReadImage(os.path.join(temp_3, "result.mhd"))
                     segmentation = sitk.GetArrayFromImage(segmentation)
-                    segmentation = np.nan_to_num(segmentation, nan=0)
+                    segmentation = np.nan_to_num(segmentation)
                     segmentation = (segmentation > self.threshold).astype(np.int16)
                     segmentation = sitk.GetImageFromArray(segmentation)
                     seg_stack.append(segmentation)
@@ -152,5 +155,14 @@ class Model():
                 staple = (staple > self.threshold_staple).astype(np.int16)
                 score = dice_score(staple, ground_truth)
                 scores_per_parameters.append(score)
+                # Hausdorff distance metric is calculated as average over all slices
+                # haus = 0
+                # for i in range(0,86):
+                #     haus += directed_hausdorff(staple[i], ground_truth[i])
+                # haus_per_parameters.append(haus/86)
+                    
+                
+                
+                
             self.segmentations.append(res_per_parameters)
             self.scores.append(scores_per_parameters)
