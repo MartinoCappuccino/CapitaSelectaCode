@@ -65,39 +65,6 @@ class Config():
                         os.mkdir(os.path.join(self.folder_results, self.now, self.patients[valid_i], self.patients[train_i]))
                         self.fullpaths_results.append(os.path.join(self.folder_results, self.now, self.patients[valid_i], self.patients[train_i]))
 
-            # self.__basepaths_parameters_per_group = []
-            # self.__fullpaths_parameters_per_group = []
-
-            # for i in range(len(self.basepaths_parameter_groups)):
-            #     path_parameter_group = self.basepaths_parameter_groups[i]
-            #     fullpath_parameter_group = self.fullpaths_parameter_groups[i]
-            #     if not os.path.isdir(fullpath_parameter_group):
-            #         continue
-            #     # Creating results folders
-            #     temp_1 = os.path.join(self.folder_results, path_parameter_group)
-            #     if not os.path.exists(temp_1):
-            #         os.mkdir(temp_1)
-            #     for path_valid in itemgetter(*[*self.valid_indx, 0])(self.basepaths)[:-1]:
-            #         temp_2 = os.path.join(temp_1, path_valid + "_as_fixed")
-            #         if not os.path.exists(temp_2):
-            #             os.mkdir(temp_2)
-            #         for path_train in itemgetter(*[*self.train_indx, 0])(self.basepaths)[:-1]:
-            #             temp_3 = os.path.join(temp_2, path_train + "_as_moving")
-            #             if not os.path.exists(temp_3):
-            #                 os.mkdir(temp_3)
-            #     # Storing parameter files per group (SORTED BY NAME)
-            #     paths_parameters = list(sorted(
-            #         filter(
-            #         lambda path : path[-4:] == ".txt", 
-            #         os.listdir(fullpath_parameter_group))
-            #     ))
-            #     fullpaths_parameters = list(map(
-            #         lambda path : os.path.join(fullpath_parameter_group, path),
-            #         paths_parameters,
-            #     ))
-            #     self.basepaths_parameters_per_group.append(paths_parameters)
-            #     self.fullpaths_parameters_per_group.append(fullpaths_parameters)
-
     def __len__(self):
         return len(self.patients)
     
