@@ -46,8 +46,9 @@ class ResidualBlock(nn.Module):
         out = self.relu(out)
         out = self.conv2(out)
         out = self.bn2(out)
+        out = out + residual
         out = self.relu(out)
-        return out + residual
+        return out
 
 rec_loss = nn.L1Loss()
 
