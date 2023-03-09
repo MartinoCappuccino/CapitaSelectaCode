@@ -135,7 +135,7 @@ class Generator(nn.Module):
             [Block(2 * chs[i], chs[i + 1]) for i in range(len(chs) - 1)]# TODO: conv block           
         )
         self.proj_o = nn.Sequential(
-            [nn.Tanh() for i in range(len(chs) - 1)]# TODO         
+            [nn.Tanh() for i in range(len(chs) - 1)]# TODO  NOT SURE  
         )  # output layer with Tanh activation
 
     def forward(self, z):
@@ -154,8 +154,8 @@ class Generator(nn.Module):
         x = self.proj_z()# TODO: fully connected layer
         x = self.reshape()# TODO: reshape to image dimensions
         for i in range(len(self.chs) - 1):
-            x = self.upconvs[i]()# TODO: transposed convolution
-            x = self.dec_blocks[i]()# TODO: convolutional block
+            x = self.upconvs[i]()# TODO: transposed convolution NOT SURE 
+            x = self.dec_blocks[i]()# TODO: convolutional block NOT SURE
         x = self.proj_o()# TODO: output layer
         return x
 

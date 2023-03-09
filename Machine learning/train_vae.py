@@ -96,7 +96,7 @@ for epoch in range(N_EPOCHS):
        # needed to zero gradients in each iterations
        optimizer.zero_grad()
        outputs = vae_model(inputs)  # forward pass
-       loss = vae.vae_loss(outputs, labels.float())
+       loss = vae.vae_loss(outputs, labels.float()) #NOT REALLY SURE
        loss.backward()  # backpropagate loss
        current_train_loss += loss.item()
        optimizer.step()  # update weights
@@ -105,7 +105,7 @@ for epoch in range(N_EPOCHS):
         vae_model.eval()
         for inputs, labels in tqdm(valid_dataloader, position=0):
             outputs = vae_model(inputs)  # forward pass
-            loss = vae.vae_loss(outputs, labels.float())
+            loss = vae.vae_loss(outputs, labels.float()) #NOT REALLY SURE, LIKE LINE 99
             current_valid_loss += loss.item()# TODO 
         
         vae_model.train()
@@ -125,7 +125,7 @@ for epoch in range(N_EPOCHS):
             "Real_fake", np.clip(img_grid[0][np.newaxis], -1, 1) / 2 + 0.5, epoch + 1
         )
         
-    # TODO: sample noise 
-    # TODO: generate images and display
+    vae.sample_z(labels.float())# TODO: sample noise  NOT SURE
+    # TODO: generate images and display NEED TO BE ADDED
 
 torch.save(vae_model.state_dict(), CHECKPOINTS_DIR / "vae_model.pth")
