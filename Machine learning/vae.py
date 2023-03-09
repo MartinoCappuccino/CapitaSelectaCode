@@ -18,10 +18,10 @@ class Block(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
         self.conv1 = nn.Conv2d(in_ch, out_ch, 3, padding=1)
-        self.relu =  nn.LeakyReLu()# TODO  # leaky ReLU
-        self.bn1 = nn.BatchNorm1d(in_ch)# TODO   # batch normalisation
+        self.relu =  nn.LeakyReLU()
+        self.bn1 = nn.BatchNorm2d(out_ch)
         self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
-        self.bn2 = nn.BatchNorm1d(in_ch)# TODO 
+        self.bn2 = nn.BatchNorm2d(out_ch) 
 
     def forward(self, x):
         """Performs a forward pass of the block
@@ -34,14 +34,14 @@ class Block(nn.Module):
         # a block consists of two convolutional layers
         # with ReLU activations
         # use batch normalisation
-
-        # TODO
+        
         x = self.conv1(x)
         x = self.relu(x)
         x = self.bn1(x)
         x = self.conv2(x)
         x = self.relu(x)
         x = self.bn2(x)
+        
         return x
 
 
@@ -62,12 +62,12 @@ class Encoder(nn.Module):
         super().__init__()
         # convolutional blocks
         self.enc_blocks = nn.ModuleList(
-            [Block(chs[i], chs[i + 1]) for i in range(len(chs) - 1)]# TODO
+            [Block(chs[i], chs[i + 1]) for i in range(len(chs) - 1)]
         )
         # max pooling
-        self.pool = nn.MaxPool2d(2)# TODO
+        self.pool = nn.MaxPool2d(2)
         # height and width of images at lowest resolution level
-        _h, _w = spatial_size# TODO
+        _h, _w = (spatial_size[0]/(2**len(chs)-1)), (spatial_size[1]/(2**len(chs)-1)) #klopt mogelijk niet 
 
         # flattening
         self.out = nn.Sequential(nn.Flatten(1), nn.Linear(chs[-1] * _h * _w, 2 * z_dim))
@@ -88,13 +88,10 @@ class Encoder(nn.Module):
         """
 
         for block in self.enc_blocks:
-            x = block(x)        
-            # # save features to concatenate to decoder blocks
-            ftrs.append(x)
-            x = self.pool(x)
-        ftrs.append(x)# TODO: conv block           
-           # TODO: pooling 
-        # TODO: output layer          
+            x = block(x)          
+            x = self.pool(x) 
+        x = self.out(x)
+          
         return torch.chunk(x, 2, dim=1)  # 2 chunks, 1 each for mu and logvar
 
 
@@ -128,14 +125,14 @@ class Generator(nn.Module):
         )  # reshaping
 
         self.upconvs = nn.ModuleList(
-            [nn.ConvTranspose2d(chs[i], chs[i], 2, 2) for i in range(len(chs) - 1)]# TODO: transposed convolution            
+            [nn.ConvTranspose2d(chs[i], chs[i], 2, 2) for i in range(len(chs) - 1)]            
         )
 
         self.dec_blocks = nn.ModuleList(
-            [Block(2 * chs[i], chs[i + 1]) for i in range(len(chs) - 1)]# TODO: conv block           
+            [Block(2 * chs[i], chs[i + 1]) for i in range(len(chs) - 1)]           
         )
         self.proj_o = nn.Sequential(
-            [nn.Tanh() for i in range(len(chs) - 1)]# TODO  NOT SURE  
+            nn.Tanh()       
         )  # output layer with Tanh activation
 
     def forward(self, z):
@@ -151,12 +148,13 @@ class Generator(nn.Module):
         x : torch.Tensor
         
         """
-        x = self.proj_z()# TODO: fully connected layer
-        x = self.reshape()# TODO: reshape to image dimensions
+        x = self.proj_z(z)
+        x = self.reshape(x)
         for i in range(len(self.chs) - 1):
-            x = self.upconvs[i]()# TODO: transposed convolution NOT SURE 
-            x = self.dec_blocks[i]()# TODO: convolutional block NOT SURE
-        x = self.proj_o()# TODO: output layer
+            x = self.upconvs[i](x)
+            x = self.dec_blocks[i](x)
+        x = self.proj_o(x)
+        
         return x
 
 

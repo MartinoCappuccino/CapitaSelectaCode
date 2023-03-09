@@ -92,21 +92,22 @@ for epoch in range(N_EPOCHS):
     
     # TODO 
     # training iterations
-    for inputs, labels in tqdm(dataloader, position=0):
-       # needed to zero gradients in each iterations
-       optimizer.zero_grad()
-       outputs = vae_model(inputs)  # forward pass
-       loss = vae.vae_loss(outputs, labels.float()) #NOT REALLY SURE
-       loss.backward()  # backpropagate loss
-       current_train_loss += loss.item()
-       optimizer.step()  # update weights
+    for inputs in tqdm(dataloader, position=0):
+        # needed to zero gradients in each iterations
+        optimizer.zero_grad()
+        recons, mu, logvar = vae_model(inputs)  # forward pass
+        loss = vae.vae_loss(inputs, recons, mu, logvar)
+        loss.backward()  # backpropagate loss
+        current_train_loss += loss.item()
+        optimizer.step()  # update weights
+        
     # evaluate validation loss
     with torch.no_grad():
         vae_model.eval()
-        for inputs, labels in tqdm(valid_dataloader, position=0):
-            outputs = vae_model(inputs)  # forward pass
-            loss = vae.vae_loss(outputs, labels.float()) #NOT REALLY SURE, LIKE LINE 99
-            current_valid_loss += loss.item()# TODO 
+        for inputs in tqdm(valid_dataloader, position=0):
+            recons, mu, logvar = vae_model(inputs)   # forward pass
+            loss = vae.vae_loss(inputs, recons, mu, logvar)
+            current_valid_loss += loss.item()
         
         vae_model.train()
     # write to tensorboard log
