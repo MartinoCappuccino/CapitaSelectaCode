@@ -67,10 +67,10 @@ class Encoder(nn.Module):
         # max pooling
         self.pool = nn.MaxPool2d(2)
         # height and width of images at lowest resolution level
-        _h, _w = (spatial_size[0]/(2**len(chs)-1)), (spatial_size[1]/(2**len(chs)-1)) #klopt mogelijk niet 
+        _h, _w = (spatial_size[0]//(2**len(chs)-1)), (spatial_size[1]//(2**len(chs)-1)) 
 
         # flattening
-        self.out = nn.Sequential(nn.Flatten(1), nn.Linear(chs[-1] * _h * _w, 2 * z_dim))
+        self.out = nn.Sequential(nn.Flatten(1), nn.Linear(int(chs[-1] * _h * _w),int( 2 * z_dim)))
 
     def forward(self, x):
         """Performs the forward pass for all blocks in the encoder.

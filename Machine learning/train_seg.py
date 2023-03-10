@@ -13,10 +13,11 @@ import utils
 random.seed(42)
 
 # directorys with data and to store training checkpoints and logs
-DATA_DIR = Path.cwd() / "TrainingData"
-CHECKPOINTS_DIR = Path.cwd() / "segmentation_model_weights"
+WORKING_DIR = Path(r"C:\Users\20182371\Documents\TUe\8DM20_CS_Medical_Imaging\DeepLearning_Project")
+DATA_DIR = WORKING_DIR / "TrainingData"
+CHECKPOINTS_DIR = WORKING_DIR / "segmentation_model_weights"
 CHECKPOINTS_DIR.mkdir(parents=True, exist_ok=True)
-TENSORBOARD_LOGDIR = "segmentation_runs"
+TENSORBOARD_LOGDIR = WORKING_DIR / "segmentation_runs"
 
 # training settings and hyperparameters
 NO_VALIDATION_PATIENTS = 2

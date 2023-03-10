@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import make_grid
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 import utils
 import vae
@@ -14,11 +15,14 @@ import vae
 # to ensure reproducible training/validation split
 random.seed(42)
 
+
 # directorys with data and to store training checkpoints and logs
-DATA_DIR = Path.cwd() / "TrainingData"
-CHECKPOINTS_DIR = Path.cwd() / "vae_model_weights"
+WORKING_DIR = Path(r"C:\Users\20182371\Documents\TUe\8DM20_CS_Medical_Imaging\DeepLearning_Project")
+DATA_DIR = WORKING_DIR / "TrainingData"
+CHECKPOINTS_DIR = WORKING_DIR / "vae_model_weights"
 CHECKPOINTS_DIR.mkdir(parents=True, exist_ok=True)
-TENSORBOARD_LOGDIR = "vae_runs"
+PROGRESS_DIR = WORKING_DIR / "progress"
+TENSORBOARD_LOGDIR = WORKING_DIR / "vae_runs"
 
 # training settings and hyperparameters
 NO_VALIDATION_PATIENTS = 2
@@ -26,8 +30,8 @@ IMAGE_SIZE = [64, 64]
 BATCH_SIZE = 32
 N_EPOCHS = 200
 DECAY_LR_AFTER = 50
-LEARNING_RATE = 1e-4
-DISPLAY_FREQ = 10
+LEARNING_RATE = 1e-3
+DISPLAY_FREQ = 5
 
 # dimension of VAE latent space
 Z_DIM = 256
@@ -80,10 +84,11 @@ valid_dataloader = DataLoader(
 
 # initialise model, optimiser
 vae_model = vae.VAE()# TODO 
-optimizer = torch.optim.Adam(vae_model.parameters(), lr = LEARNING_RATE)# TODO 
+optimizer = torch.optim.Adam(vae_model.parameters(), lr = LEARNING_RATE, betas=(0.0,0.9))# TODO 
 # add a learning rate scheduler based on the lr_lambda function
-scheduler = lr_lambda(N_EPOCHS) # TODO
+scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda) # TODO
 
+x_real = next(iter(valid_dataloader))
 # training loop
 writer = SummaryWriter(log_dir=TENSORBOARD_LOGDIR)  # tensorboard summary
 for epoch in range(N_EPOCHS):
@@ -92,7 +97,7 @@ for epoch in range(N_EPOCHS):
     
     # TODO 
     # training iterations
-    for inputs in tqdm(dataloader, position=0):
+    for inputs, labels in tqdm(dataloader, position=0):
         # needed to zero gradients in each iterations
         optimizer.zero_grad()
         recons, mu, logvar = vae_model(inputs)  # forward pass
@@ -115,18 +120,22 @@ for epoch in range(N_EPOCHS):
     writer.add_scalar(
         "Loss/validation", current_valid_loss / len(valid_dataloader), epoch
     )
+    print(f"Epoch #{epoch} Loss/train {current_train_loss / len(dataloader):.5f} | Loss/validation {current_valid_loss / len(valid_dataloader):.5f}")
     scheduler.step() # step the learning step scheduler
 
     # save examples of real/fake images
     if (epoch + 1) % DISPLAY_FREQ == 0:
+        x_recon = vae_model(x_real)[0]
         img_grid = make_grid(
             torch.cat((x_recon[:5], x_real[:5])), nrow=5, padding=12, pad_value=-1
         )
+        img = np.clip(img_grid[0][np.newaxis], -1, 1) / 2 + 0.5
         writer.add_image(
-            "Real_fake", np.clip(img_grid[0][np.newaxis], -1, 1) / 2 + 0.5, epoch + 1
+            "Real_fake", img, epoch + 1,
         )
-        
-    vae.sample_z(labels.float())# TODO: sample noise  NOT SURE
+        plt.imsave(PROGRESS_DIR / f"Real_fake_{epoch:03d}.png", img[0])
+    
+    # TODO: sample noise  
     # TODO: generate images and display NEED TO BE ADDED
 
 torch.save(vae_model.state_dict(), CHECKPOINTS_DIR / "vae_model.pth")
