@@ -7,8 +7,8 @@ from upsample import Upsample
 from utils import sample_z
 
 _conv = \
-lambda in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, : \
-    nn.Conv2d(in_channels, out_channels, kernel_size, stride  , padding  , bias=bias, padding_mode="reflect")
+    lambda    in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, : \
+    nn.Conv2d(in_channels, out_channels, kernel_size, stride  , padding  , bias=bias)
 _batch_norm = nn.InstanceNorm2d
 _relu = lambda : nn.LeakyReLU(negative_slope=0.2, inplace=True)
 _upsample = lambda : Upsample([1,3,3,1])
@@ -69,22 +69,24 @@ class ResidualBlock(nn.Module):
         self.conv2 = _conv(out_ch, out_ch, 3,      1, 1, bias=False)
         self.bn2 = batch_norm(out_ch)
 
-        self.shortcut = []
         if stride!=1 or in_ch!=out_ch:
-            self.shortcut.append(_conv(in_ch, out_ch, 1, stride, bias=True))
-            self.shortcut.append(batch_norm(out_ch))
-        self.shortcut = nn.Sequential(*self.shortcut)
+            self.convsc = _conv(in_ch, out_ch, 1, stride, bias=True)
+            self.bnsc   = batch_norm(out_ch)
+        else:
+            self.convsc = (lambda x, *args : x)
+            self.bnsc   = (lambda x, *args : x)
 
     def forward(self, x, segmap=None):
-        residual = self.upsample(x)
-        residual = self.shortcut(residual)
+        res = self.upsample(x)
+        res = self.convsc(res)
+        res = self.bnsc(res, segmap) if self.spade else self.bnsc(res)
         out = self.upsample(x)
         out = self.conv1(out)
         out = self.bn1(out, segmap) if self.spade else self.bn1(out)
         out = self.relu(out)
         out = self.conv2(out)
         out = self.bn2(out, segmap) if self.spade else self.bn2(out)
-        out = out + residual
+        out = out + res
         out = self.relu(out)
         return out
     
@@ -133,7 +135,8 @@ class Encoder(nn.Module):
                 out = block(out)
 
         out = self.final(out)
-        return torch.chunk(out, 2, dim=1)  # 2 chunks, 1 each for mu and logvar
+        mu, logvar = torch.chunk(out, 2, dim=1)
+        return mu, logvar   # 2 chunks, 1 each for mu and logvar
     
 
 class Generator(nn.Module):
@@ -144,7 +147,7 @@ class Generator(nn.Module):
             chs          : Tuple[int, int, int, int] = _chs_g, 
             layers       : Tuple[int, int, int, int] = _layers, 
             spade        : bool = False, 
-            tanh         : bool = True
+            tanh         : bool = True,
         ):
         super(Generator, self).__init__()
         self.z_dim = z_dim  
@@ -173,7 +176,7 @@ class Generator(nn.Module):
         layers = [ResidualBlock(in_ch, out_ch, 1, upsample, spade=self.spade)]
         for i in range(blocks-1):
             layers.append(ResidualBlock(out_ch, out_ch, 1, 1, spade=self.spade))
-        return nn.Sequential(*layers)
+        return nn.ModuleList(layers)
 
     def forward(self, z, segmap=None):
         out = self.proj_z(z)
@@ -222,9 +225,9 @@ class Discriminator(nn.Module):
         layers = [ResidualBlock(in_ch, out_ch, stride, 1)]
         for i in range(blocks-1):
             layers.append(ResidualBlock(out_ch, out_ch, 1, 1))
-        return layers
+        return nn.ModuleList(layers)
 
-    def forward(self, x):
+    def forward(self, x, features=False):
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu1(out)
@@ -233,11 +236,11 @@ class Discriminator(nn.Module):
         for i, layer in enumerate(self.layers, start=1):
             for block in layer:
                 out = block(out)
-            if i == self.l:
-                features = out
+            if i == self.l and features:
+                return out
 
         out = self.final(out)
-        return out, features
+        return out
     
 
 class VAE(nn.Module):
@@ -249,7 +252,7 @@ class VAE(nn.Module):
         spade  : bool = False,
         tanh   : bool = True,
     ):
-        super().__init__()
+        super(VAE, self).__init__()
         self.encoder = Encoder(chs=chs_e, layers=layers)
         self.generator = Generator(chs=chs_g, layers=layers, spade=spade, tanh=tanh)
 
@@ -271,7 +274,7 @@ class VAEGAN(nn.Module):
         spade  : bool = False,
         tanh   : bool = True,
     ):
-        super().__init__()
+        super(VAEGAN, self).__init__()
         self.encoder = Encoder(chs=chs_e, layers=layers)
         self.generator = Generator(chs=chs_g, layers=layers, spade=spade, tanh=tanh)
         self.discriminator = Discriminator(chs=chs_d, layers=layers)
@@ -281,7 +284,10 @@ class VAEGAN(nn.Module):
         latent_z = sample_z(mu, logvar)
         recons = self.generator(latent_z, segmap)
         
-        scores_real, features_real = self.discriminator(x)
-        scores_fake, features_fake = self.discriminator(recons)
+        scores_real = self.discriminator(x)
+        features_real = self.discriminator(x, True)
+        
+        scores_fake = self.discriminator(recons)
+        features_fake = self.discriminator(recons, True)
 
         return recons, mu, logvar, scores_real, features_real, scores_fake, features_fake
