@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from typing import List, Tuple
-from upsample import Upsample
+from upfirdn2d import Upsample
+from nonleaking import augment
 from utils import sample_z
 
 _conv = \
@@ -249,12 +250,13 @@ class VAE(nn.Module):
         chs_e  : Tuple[int, int, int, int] = _chs_e,
         chs_g  : Tuple[int, int, int, int] = _chs_g,
         layers : Tuple[int, int, int, int] = _layers,
+        z_dim  : int = _z_dim,
         spade  : bool = False,
         tanh   : bool = True,
     ):
         super(VAE, self).__init__()
-        self.encoder = Encoder(chs=chs_e, layers=layers)
-        self.generator = Generator(chs=chs_g, layers=layers, spade=spade, tanh=tanh)
+        self.encoder = Encoder(chs=chs_e, layers=layers, z_dim=z_dim)
+        self.generator = Generator(chs=chs_g, layers=layers, z_dim=z_dim, spade=spade, tanh=tanh)
 
     def forward(self, x, segmap=None):
         mu, logvar = self.encoder(x)
@@ -271,23 +273,27 @@ class VAEGAN(nn.Module):
         chs_g  : Tuple[int, int, int, int] = _chs_g,
         chs_d  : Tuple[int, int, int, int] = _chs_d,
         layers : Tuple[int, int, int, int] = _layers,
+        z_dim  : int = _z_dim,
         spade  : bool = False,
         tanh   : bool = True,
     ):
         super(VAEGAN, self).__init__()
-        self.encoder = Encoder(chs=chs_e, layers=layers)
-        self.generator = Generator(chs=chs_g, layers=layers, spade=spade, tanh=tanh)
+        self.encoder = Encoder(chs=chs_e, layers=layers, z_dim=z_dim)
+        self.generator = Generator(chs=chs_g, layers=layers, z_dim=z_dim, spade=spade, tanh=tanh)
         self.discriminator = Discriminator(chs=chs_d, layers=layers)
 
-    def forward(self, x, segmap=None):
+    def forward(self, x, segmap=None, ada_p=0):
         mu, logvar = self.encoder(x)
         latent_z = sample_z(mu, logvar)
         recons = self.generator(latent_z, segmap)
         
-        scores_real = self.discriminator(x)
-        features_real = self.discriminator(x, True)
-        
-        scores_fake = self.discriminator(recons)
+        features_real = self.discriminator(     x, True)
         features_fake = self.discriminator(recons, True)
 
-        return recons, mu, logvar, scores_real, features_real, scores_fake, features_fake
+        x      = augment(     x, ada_p)[0] if ada_p > 0 else x
+        recons = augment(recons, ada_p)[0] if ada_p > 0 else recons
+
+        scores_real = self.discriminator(x)
+        scores_fake = self.discriminator(recons)
+        
+        return recons, mu, logvar, features_real, features_fake, scores_real, scores_fake
