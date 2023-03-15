@@ -1,3 +1,5 @@
+# https://github.com/amazon-science/gan-control/
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
