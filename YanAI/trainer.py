@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from networks import VAE, VAEGAN
-from utils import kld_loss, get_noise
+from utils import kld_loss, get_noise, accumulate
 from nonleaking import AdaptiveAugment
 from typing import Tuple, Callable, List, Union
 from pathlib import Path
@@ -118,25 +118,6 @@ class TrainerBase():
             if (epoch + 1) % display_freq == 0:
                 self.save_progress_image(epoch)
 
-    def save_progress_image(self, epoch):
-        with torch.no_grad():
-            recons_train = self.net(self.x_fixed_t, self.y_fixed_t)[0]
-            recons_valid = self.net(self.x_fixed_v, self.y_fixed_v)[0]
-            generations  = self.net.generator(self.z_fixed, self.y_fixed_v)
-
-            img_grid = make_grid(
-                torch.cat([
-                    self.x_fixed_t.cpu(), 
-                    recons_train.cpu(),
-                    self.x_fixed_v.cpu(), 
-                    recons_valid.cpu(), 
-                    generations.cpu(),
-                ]), 
-                nrow=5, 
-                padding=12, 
-                pad_value=-1, 
-            )
-            plt.imsave(self.progress_dir / f"real_fake_{epoch+1:03d}.png", img_grid.numpy()[0] / 2.0 + 0.5)
 
 class TrainerVAE(TrainerBase):
     loss_names : Tuple[str] = ("Rec_Loss", "KLD")
@@ -179,6 +160,26 @@ class TrainerVAE(TrainerBase):
             kld_loss = self.kld_loss_func(mu, logvar)
             rec_loss = self.rec_loss_func(images, recons)
         return rec_loss.item(), kld_loss.item()
+    
+    def save_progress_image(self, epoch):
+        with torch.no_grad():
+            recons_train = self.net(self.x_fixed_t, self.y_fixed_t)[0]
+            recons_valid = self.net(self.x_fixed_v, self.y_fixed_v)[0]
+            generations  = self.net.generator(self.z_fixed, self.y_fixed_v)
+
+            img_grid = make_grid(
+                torch.cat([
+                    self.x_fixed_t.cpu(), 
+                    recons_train.cpu(),
+                    self.x_fixed_v.cpu(), 
+                    recons_valid.cpu(), 
+                    generations.cpu(),
+                ]), 
+                nrow=5, 
+                padding=12, 
+                pad_value=-1, 
+            )
+            plt.imsave(self.progress_dir / f"real_fake_{epoch+1:03d}.png", img_grid.numpy()[0] / 2.0 + 0.5)
 
     
 class TrainerVAEGAN(TrainerBase):
@@ -193,6 +194,8 @@ class TrainerVAEGAN(TrainerBase):
             progress_dir,
             train_loader, 
             valid_loader,
+            net_ema = None,
+            accum = 0.999,
             gamma = 1.0,
             ada_target = 0,
             ada_length = 10000,
@@ -222,6 +225,10 @@ class TrainerVAEGAN(TrainerBase):
         self.r_t_stat = 0
         self.ada_augment = AdaptiveAugment(ada_target, ada_length, 8, device)
         self.ada_p_log = []
+
+        # EMA
+        self.accum   = accum
+        self.net_ema = net_ema
 
     def train_step(self, images: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         recons, mu, logvar, features_real, features_fake, scores_real, scores_fake = self.net(
@@ -265,6 +272,9 @@ class TrainerVAEGAN(TrainerBase):
             self.ada_p = self.ada_augment.tune(scores_real)
             self.r_t_stat = self.ada_augment.r_t_stat
 
+        # EMA
+        accumulate(self.net_ema, self.net, self.accum)
+
         return rec_loss.item(), kld_loss.item(), discl_loss.item(), adv_loss.item()
     
     def valid_step(self, images: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
@@ -277,3 +287,25 @@ class TrainerVAEGAN(TrainerBase):
                         0.5 * self.adv_loss_func(scores_fake, torch.zeros_like(scores_fake))
             
         return rec_loss.item(), kld_loss.item(), discl_loss.item(), adv_loss.item()
+    
+    def save_progress_image(self, epoch):
+        with torch.no_grad():
+            net = self.net_ema if self.net_ema is not None else self.net
+            net.eval()
+            recons_train = net(self.x_fixed_t, self.y_fixed_t)[0]
+            recons_valid = net(self.x_fixed_v, self.y_fixed_v)[0]
+            generations  = net.generator(self.z_fixed, self.y_fixed_v)
+
+            img_grid = make_grid(
+                torch.cat([
+                    self.x_fixed_t.cpu(), 
+                    recons_train.cpu(),
+                    self.x_fixed_v.cpu(), 
+                    recons_valid.cpu(), 
+                    generations.cpu(),
+                ]), 
+                nrow=5, 
+                padding=12, 
+                pad_value=-1, 
+            )
+            plt.imsave(self.progress_dir / f"real_fake_{epoch+1:03d}.png", img_grid.numpy()[0] / 2.0 + 0.5)
