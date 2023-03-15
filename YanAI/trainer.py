@@ -36,7 +36,7 @@ class TrainerBase():
 
         # Progress stuff
         np.random.seed(seed)
-        
+
         self.progress_dir = progress_dir
 
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
@@ -107,12 +107,12 @@ class TrainerBase():
             for i in range(len(self.loss_names)):
                 self.train_losses[i].append(train_losses[i])
                 self.valid_losses[i].append(valid_losses[i])
-            msg = f"Epoch #{epoch}: "
+            msg = f"Epoch #{epoch:03d}: "
             for i in range(len(self.loss_names)):
-                msg = msg + f"{self.loss_names[i]}/train = {train_losses[i]:.5f}, "
+                msg = msg + f"{self.loss_names[i]}/train = {train_losses[i]:.3f}, "
             msg = msg[:-2] + " | "
             for i in range(len(self.loss_names)):
-                msg = msg + f"{self.loss_names[i]}/valid = {valid_losses[i]:.5f}, "
+                msg = msg + f"{self.loss_names[i]}/valid = {valid_losses[i]:.3f}, "
             msg = msg[:-2]
             tqdm.write(msg)
             if (epoch + 1) % display_freq == 0:
