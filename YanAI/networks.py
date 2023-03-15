@@ -274,13 +274,14 @@ class VAEGAN(nn.Module):
         chs_d  : Tuple[int, int, int, int] = _chs_d,
         layers : Tuple[int, int, int, int] = _layers,
         z_dim  : int = _z_dim,
+        l      : int = 2,
         spade  : bool = False,
         tanh   : bool = True,
     ):
         super(VAEGAN, self).__init__()
         self.encoder = Encoder(chs=chs_e, layers=layers, z_dim=z_dim)
         self.generator = Generator(chs=chs_g, layers=layers, z_dim=z_dim, spade=spade, tanh=tanh)
-        self.discriminator = Discriminator(chs=chs_d, layers=layers)
+        self.discriminator = Discriminator(chs=chs_d, layers=layers, l=l)
 
     def forward(self, x, segmap=None, ada_p=0):
         mu, logvar = self.encoder(x)
