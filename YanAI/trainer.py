@@ -61,7 +61,7 @@ class TrainerBase():
         self.net.train()
         epoch_losses = np.zeros((len(self.loss_names),), dtype=np.float32)
         n = 0
-        for images, masks in tqdm(self.train_loader):
+        for images, masks in tqdm(self.train_loader, leave=False):
             images = images.to(self.device)
             masks  =  masks.to(self.device)
             losses = self.train_step(images, masks)
@@ -75,7 +75,7 @@ class TrainerBase():
         self.net.eval()
         epoch_losses = np.zeros((len(self.loss_names),), dtype=np.float32)
         n = 0
-        for images, masks in tqdm(self.valid_loader):
+        for images, masks in tqdm(self.valid_loader, leave=False):
             images = images.to(self.device)
             masks  =  masks.to(self.device)
             losses = self.valid_step(images, masks)
