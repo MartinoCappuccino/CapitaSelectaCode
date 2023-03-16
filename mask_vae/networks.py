@@ -263,31 +263,3 @@ class VAE(nn.Module):
         
         return recons, mu, logvar
     
-
-class VAEGAN(nn.Module):
-    def __init__(
-        self,
-        chs_e  : Tuple[int, int, int, int] = _chs_e,
-        chs_g  : Tuple[int, int, int, int] = _chs_g,
-        chs_d  : Tuple[int, int, int, int] = _chs_d,
-        layers : Tuple[int, int, int, int] = _layers,
-        spade  : bool = False,
-        tanh   : bool = True,
-    ):
-        super(VAEGAN, self).__init__()
-        self.encoder = Encoder(chs=chs_e, layers=layers)
-        self.generator = Generator(chs=chs_g, layers=layers, spade=spade, tanh=tanh)
-        self.discriminator = Discriminator(chs=chs_d, layers=layers)
-
-    def forward(self, x, segmap=None):
-        mu, logvar = self.encoder(x)
-        latent_z = sample_z(mu, logvar)
-        recons = self.generator(latent_z, segmap)
-        
-        scores_real = self.discriminator(x)
-        features_real = self.discriminator(x, True)
-        
-        scores_fake = self.discriminator(recons)
-        features_fake = self.discriminator(recons, True)
-
-        return recons, mu, logvar, scores_real, features_real, scores_fake, features_fake
