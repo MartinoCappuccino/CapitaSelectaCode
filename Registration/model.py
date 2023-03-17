@@ -157,6 +157,10 @@ class Model():
             staple = sitk.GetArrayFromImage(staple)
             staple = (staple > self.threshold_staple).astype(np.int16)
             
+            sitk.WriteImage(sitk.GetImageFromArray(staple), os.path.join(self.config.folder_results, self.config.now, self.config.patients[valid_i], 'staple.mhd'))
+            
+            
+            
             dice = dice_score(staple, ground_truth)
             
             hausdorf = []

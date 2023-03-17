@@ -11,6 +11,7 @@ from utils import kld_loss, get_noise
 from typing import Tuple, Callable, List, Union
 from pathlib import Path
 from utils import dice_loss
+from torch.utils.tensorboard import SummaryWriter
 
 from tqdm.auto import tqdm, trange
 
@@ -78,6 +79,7 @@ class TrainerMaskBase():
                            for optimizer in self.optimizers]
         self.num_epochs = num_epochs
         self.nstep = 0
+        
         for epoch in range(num_epochs):
             train_losses = self.train_epoch()
             valid_losses = self.valid_epoch()
@@ -144,12 +146,17 @@ class TrainerMaskVAE(TrainerMaskBase):
         return rec_loss.item(), kld_loss.item()
     
     def valid_step(self, masks: torch.Tensor) -> Tuple[float]:
+    
         with torch.no_grad():
             recons, mu, logvar = self.net(masks)
             recons = recons/2.0 + 0.5
             kld_loss = self.kld_loss_func(mu, logvar)
             rec_loss = self.rec_loss_func(masks, recons)
+            
         return rec_loss.item(), kld_loss.item()
+    
+    
+    
     
     def save_progress_image(self, epoch):
         with torch.no_grad():
