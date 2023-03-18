@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-
 class Block(nn.Module):
     """A representation for the basic convolutional building block of the unet
 

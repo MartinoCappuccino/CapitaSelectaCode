@@ -1,10 +1,90 @@
-import numpy as np
-import SimpleITK as sitk
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.transforms as transforms
+import SimpleITK as sitk
+import os 
+import numpy as np 
+from tqdm.auto import tqdm, trange
 
+def get_noise(n_samples, z_dim, device="cpu"):
+    return torch.randn(n_samples, z_dim, device=device)
 
+def sample_z(mu, logvar):
+    eps = torch.randn(mu.size(), device=mu.device).to(mu.dtype)
+    return (logvar / 2).exp() * eps + mu
+
+def kld_loss(mu, logvar):
+    return -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+
+def dice_loss(inputs, recons, eps=1e-5):
+    intersection = torch.sum(inputs * recons)
+    divider = torch.sum(inputs) + torch.sum(recons)
+    dice = 2.0 * intersection + eps
+    dice /= divider + eps
+    return 1 - dice
+
+def remove_empty_masks(data_dir):
+    
+    patients = [
+    path 
+    for path in data_dir.glob("*")
+    if not any(part.startswith(".") for part in path.parts)
+    ]
+    
+    for patient in patients:
+        img = sitk.GetArrayFromImage(sitk.ReadImage(patient / "prostaat.mhd"))
+        new_img = []
+        for i in range(86):
+            if  (img[i,:,:] == 1).any():
+                new_img.append(img[i,:,:]) 
+            
+        img_array = np.array(new_img)
+        new_prostaat = sitk.GetImageFromArray(img_array)
+        sitk.WriteImage(new_prostaat, os.path.join(data_dir, patient, "new_prostaat.mhd"))
+
+class ProstateMRMaskDataset(torch.utils.data.Dataset):
+    """Dataset containing prostate MR images.
+
+    Parameters
+    ----------
+    paths : list[Path]
+        paths to the patient data
+    img_size : list[int]
+        size of images to be interpolated to
+    empty_masks: boleaan
+        option include or exclude empty masks
+        False for no empty mask
+    """
+
+    def __init__(self, paths, img_size, empty_masks = False):
+        self.labels = []
+        # load images
+        
+        if empty_masks == False: 
+            prostaat = "new_prostaat.mhd"
+        else: 
+            prostaat = "prostaat.mhd"
+            
+        for path in paths:
+
+            mask = sitk.GetArrayFromImage(sitk.ReadImage(path / prostaat)).astype(np.float32)
+            mask = torch.from_numpy(mask)[:,None]
+            mask = mask.repeat_interleave(2, dim=1)
+
+            mask = F.interpolate(mask, size=img_size, mode='nearest')
+            mask[:,1] = 1 - mask[:,1]
+
+            self.labels.append(mask)
+        self.labels = torch.cat(self.labels, dim=0)
+
+    def __len__(self):
+        return self.labels.shape[0]
+
+    def __getitem__(self, index):
+        labels = self.labels[index]
+        return labels
+    
 class ProstateMRDataset(torch.utils.data.Dataset):
     """Dataset containing prostate MR images.
 
@@ -17,66 +97,96 @@ class ProstateMRDataset(torch.utils.data.Dataset):
     """
 
     def __init__(self, paths, img_size):
-        self.mr_image_list = []
-        self.mask_list = []
-        # load images
+        self.images = []
+        self.labels = []
         for path in paths:
-            self.mr_image_list.append(
-                sitk.GetArrayFromImage(sitk.ReadImage(path / "mr_bffe.mhd"))
-            )
-            self.mask_list.append(
-                sitk.GetArrayFromImage(sitk.ReadImage(path / "prostaat.mhd"))
-            )
+            img = sitk.GetArrayFromImage(sitk.ReadImage(path / "mr_bffe.mhd")).astype(np.float32)
+            img = torch.from_numpy(img)[:,None]
+            p99 = torch.quantile(img, 0.99)
+            p01 = torch.quantile(img, 0.01)
+            
+            img[img>p99] = p99
+            img[img<p01] = p01
+            img = (img - p01)/(p99 - p01)*2.0 - 1.0
 
-        # number of patients and slices in the dataset
-        self.no_patients = len(self.mr_image_list)
-        self.no_slices = self.mr_image_list[0].shape[0]
+            img = F.interpolate(img, size=img_size, mode='bilinear', antialias=True)
 
-        # transforms to resize images
-        self.img_transform = transforms.Compose(
-            [
-                transforms.ToPILImage(),
-                transforms.CenterCrop(256),
-                transforms.Resize(img_size),
-                transforms.ToTensor(),
-            ]
-        )
-        # standardise intensities based on mean and std deviation
-        self.train_data_mean = np.mean(self.mr_image_list)
-        self.train_data_std = np.std(self.mr_image_list)
-        self.norm_transform = transforms.Normalize(
-            self.train_data_mean, self.train_data_std
-        )
+            mask = sitk.GetArrayFromImage(sitk.ReadImage(path / "prostaat.mhd")).astype(np.float32)
+            mask = torch.from_numpy(mask)[:,None]
+            mask = mask.repeat_interleave(2, dim=1)
+
+            mask = F.interpolate(mask, size=img_size, mode='nearest')
+            mask[:,1] = 1 - mask[:,1]
+
+            #assert img.shape[0] == mask.shape[0]
+            self.images.append(img)
+            self.labels.append(mask)
+        self.images = torch.cat(self.images, dim=0)
+        self.labels = torch.cat(self.labels, dim=0)
+
+    def __len__(self):
+        return self.images.shape[0]
+
+    def __getitem__(self, index):
+        images = self.images[index]
+        labels = self.labels[index]
+        return images, labels
+    
+class ProstateMRUNETDataset(torch.utils.data.Dataset):
+    """Dataset containing prostate MR images.
+
+    Parameters
+    ----------
+    paths : list[Path]
+        paths to the patient data
+    img_size : list[int]
+        size of images to be interpolated to
+    """
+
+    def __init__(self, paths, img_size, mask_generator, image_generator, ratio, validation=True):
+        self.images = []
+        self.labels = []
+        # load images  
+        for path in paths:
+            img = sitk.GetArrayFromImage(sitk.ReadImage(path / "mr_bffe.mhd")).astype(np.float32)
+            img = torch.from_numpy(img)[:,None]
+            p99 = torch.quantile(img, 0.99)
+            p01 = torch.quantile(img, 0.01)
+            
+            img[img>p99] = p99
+            img[img<p01] = p01
+            img = (img - p01)/(p99 - p01)*2.0 - 1.0
+
+            img = F.interpolate(img, size=img_size, mode='bilinear', antialias=True)
+
+            mask = sitk.GetArrayFromImage(sitk.ReadImage(path / "prostaat.mhd")).astype(np.float32)
+            mask = torch.from_numpy(mask)[:,None]
+            mask = mask.repeat_interleave(2, dim=1)
+
+            mask = F.interpolate(mask, size=img_size, mode='nearest')
+            mask[:,1] = 1 - mask[:,1]
+            #assert img.shape[0] == mask.shape[0]
+            self.images.append(img)
+            self.labels.append(mask)
+
+        self.images = torch.cat(self.images, dim=0)
+        self.labels = torch.cat(self.labels, dim=0)
+
+        if validation == False:
+            for i in range(int(len(self.images)*ratio)):
+                new_mask = mask_generator(self.labels[i])
+                new_image = image_generator(new_mask)
+                self.images = torch.cat(new_image, dim=0)
+                self.labels = torch.cat(new_mask, dim=0)
 
     def __len__(self):
         """Returns length of dataset"""
-        return self.no_patients * self.no_slices
+        return self.images.shape[0]
 
     def __getitem__(self, index):
-        """Returns the preprocessing MR image and corresponding segementation
-        for a given index.
-
-        Parameters
-        ----------
-        index : int
-            index of the image/segmentation in dataset
-        """
-
-        # compute which slice an index corresponds to
-        patient = index // self.no_slices
-        the_slice = index - (patient * self.no_slices)
-
-        return (
-            self.norm_transform(
-                self.img_transform(
-                    self.mr_image_list[patient][the_slice, ...].astype(np.float32)
-                )
-            ),
-            self.img_transform(
-                (self.mask_list[patient][the_slice, ...] > 0).astype(np.int32)
-            ),
-        )
-
+        images = self.images[index]
+        labels = self.labels[index]
+        return images, labels
 
 class DiceBCELoss(nn.Module):
     """Loss function, computed as the sum of Dice score and binary cross-entropy.

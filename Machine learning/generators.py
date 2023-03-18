@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from typing import List, Tuple
 from upsample import Upsample
 from utils import sample_z
+from nonleaking import augment
 
 _conv = \
     lambda    in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, : \
@@ -48,7 +49,6 @@ class SPADE(nn.Module):
 
         return out
     
-
 class ResidualBlock(nn.Module):
     def __init__(
             self, 
@@ -242,7 +242,6 @@ class Discriminator(nn.Module):
         out = self.final(out)
         return out
     
-
 class VAE(nn.Module):
     def __init__(
         self,
@@ -262,4 +261,37 @@ class VAE(nn.Module):
         recons = self.generator(latent_z, segmap)
         
         return recons, mu, logvar
+    
+class VAEGAN(nn.Module):
+    def __init__(
+        self,
+        chs_e  : Tuple[int, int, int, int] = _chs_e,
+        chs_g  : Tuple[int, int, int, int] = _chs_g,
+        chs_d  : Tuple[int, int, int, int] = _chs_d,
+        layers : Tuple[int, int, int, int] = _layers,
+        z_dim  : int = _z_dim,
+        l      : int = 2,
+        spade  : bool = False,
+        tanh   : bool = True,
+    ):
+        super(VAEGAN, self).__init__()
+        self.encoder = Encoder(chs=chs_e, layers=layers, z_dim=z_dim)
+        self.generator = Generator(chs=chs_g, layers=layers, z_dim=z_dim, spade=spade, tanh=tanh)
+        self.discriminator = Discriminator(chs=chs_d, layers=layers, l=l)
+
+    def forward(self, x, segmap=None, ada_p=0):
+        mu, logvar = self.encoder(x)
+        latent_z = sample_z(mu, logvar)
+        recons = self.generator(latent_z, segmap)
+        
+        features_real = self.discriminator(     x, True)
+        features_fake = self.discriminator(recons, True)
+
+        x = augment(x, ada_p)[0] if ada_p > 0 else x
+        recons = augment(recons, ada_p)[0] if ada_p > 0 else recons
+
+        scores_real = self.discriminator(x)
+        scores_fake = self.discriminator(recons)
+        
+        return recons, mu, logvar, features_real, features_fake, scores_real, scores_fake
     
