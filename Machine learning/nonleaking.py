@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import math
-from upfirdn2d import upfirdn2d
+from upsample import upfirdn2d
 
 SYM6 = (
     0.015404109327027373,

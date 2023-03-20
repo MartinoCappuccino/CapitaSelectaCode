@@ -5,8 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from utils import kld_loss, get_noise
 from typing import Tuple, Callable, List, Union
-from utils import dice_loss, DiceBCELoss
+from utils import dice_loss, DiceBCELoss, accumulate
 from tqdm.auto import tqdm
+from nonleaking import AdaptiveAugment
 
 class TrainerBase():
     loss_names : Tuple[str] = ()

@@ -248,6 +248,7 @@ class VAE(nn.Module):
         chs_e  : Tuple[int, int, int, int] = _chs_e,
         chs_g  : Tuple[int, int, int, int] = _chs_g,
         layers : Tuple[int, int, int, int] = _layers,
+        z_dim  : int = _z_dim,
         spade  : bool = False,
         tanh   : bool = True,
     ):
