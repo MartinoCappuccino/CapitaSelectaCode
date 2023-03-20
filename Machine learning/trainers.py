@@ -50,7 +50,7 @@ class TrainerBase():
         n = 0
         for images, masks in tqdm(self.train_loader, leave=False):
             images = images.to(self.device)
-            masks  =  masks.to(self.device)
+            masks = masks.to(self.device)
             losses = self.train_step(images, masks)
             self.nstep += 1
             n += images.shape[0]
@@ -113,7 +113,7 @@ class TrainerBase():
                 if os.path.exists(self.CHECKPOINTS_DIR / f"model.pth"):
                     os.remove( self.CHECKPOINTS_DIR / f"model.pth")
                 torch.save(
-                    self.net.cpu().state_dict(),
+                    self.net.state_dict(),
                     self.CHECKPOINTS_DIR / f"model.pth",
                 )
             else:
@@ -358,8 +358,8 @@ class TrainerMaskVAE(TrainerBase):
             train_loader, 
             valid_loader,
             CHECKPOINTS_DIR,
-            TOLERANCE,
-            minimum_valid_loss,
+            TOLERANCE=0.01,
+            minimum_valid_loss=10e8,
             device = "cpu",
             seed = 0
         ):
@@ -379,15 +379,19 @@ class TrainerMaskVAE(TrainerBase):
         # Progress stuff
         self.progress_dir = progress_dir
 
-        self.mask_fixed_t = next(iter(train_loader))
-        self.mask_fixed_t = self.mask_fixed_t[:5].to(device)
+        indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
+        self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
+        self.x_fixed_t = self.x_fixed_t.to(device)
+        self.y_fixed_t = self.y_fixed_t.to(device)
 
-        self.mask_fixed_v = next(iter(valid_loader))
-        self.mask_fixed_v = self.mask_fixed_v[:5].to(device)
+        indx_v = np.random.choice(np.arange(len(valid_loader.dataset)), size=5, replace=False)
+        self.x_fixed_v, self.y_fixed_v = valid_loader.dataset[indx_v]
+        self.x_fixed_v = self.x_fixed_v.to(device)
+        self.y_fixed_v = self.y_fixed_v.to(device)
 
         self.z_fixed = get_noise(5, net.generator.z_dim, device)
 
-    def train_step(self, masks: torch.Tensor) -> Tuple[float]:
+    def train_step(self, images: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         self.net.zero_grad()
         recons, mu, logvar = self.net(masks)
         recons = recons/2.0 + 0.5
@@ -397,8 +401,7 @@ class TrainerMaskVAE(TrainerBase):
         self.optimizer.step()
         return rec_loss.item(), kld_loss.item()
     
-    def valid_step(self, masks: torch.Tensor) -> Tuple[float]:
-    
+    def valid_step(self, images: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         with torch.no_grad():
             recons, mu, logvar = self.net(masks)
             recons = recons/2.0 + 0.5
@@ -409,18 +412,18 @@ class TrainerMaskVAE(TrainerBase):
      
     def save_progress_image(self, epoch):
         with torch.no_grad():
-            recons_train = self.net(self.mask_fixed_t)[0]
+            recons_train = self.net(self.y_fixed_t)[0]
             recons_train = recons_train/2.0 + 0.5 
-            recons_valid = self.net(self.mask_fixed_v)[0]
+            recons_valid = self.net(self.y_fixed_v)[0]
             recons_valid = recons_valid/2.0 + 0.5
             generations  = self.net.generator(self.z_fixed)
             generations  = generations/2.0 + 0.5 
 
             img_grid = make_grid(
                 torch.cat([
-                    self.mask_fixed_t.cpu(), 
+                    self.y_fixed_t.cpu(), 
                     recons_train.cpu(),
-                    self.mask_fixed_v.cpu(), 
+                    self.y_fixed_v.cpu(), 
                     recons_valid.cpu(), 
                     generations.cpu(),
                 ]), 
@@ -463,25 +466,26 @@ class TrainerUNET(TrainerBase):
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
         self.x_fixed_t = self.x_fixed_t.to(device)
-        self.y_fixed_t = self.y_fixed_t.to(device)
+        self.y_fixed_t = self.y_fixed_t[:, 0:1].to(device)
 
         indx_v = np.random.choice(np.arange(len(valid_loader.dataset)), size=5, replace=False)
         self.x_fixed_v, self.y_fixed_v = valid_loader.dataset[indx_v]
         self.x_fixed_v = self.x_fixed_v.to(device)
-        self.y_fixed_v = self.y_fixed_v.to(device)
+        self.y_fixed_v = self.y_fixed_v[:, 0:1].to(device)
 
     def train_step(self, inputs: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         self.net.zero_grad()
-        # if self.RATIO > 0:
-        #     random_tensors = get_noise(int(len(inputs)*self.RATIO), self.mask_generator.generator.z_dim, self.device)
-        #     generated_masks = self.mask_generator.generator(random_tensors)
-        #     random_tensors = get_noise(int(len(inputs)*self.RATIO), self.image_generator.generator.z_dim, self.device)
-        #     generated_images  = self.image_generator.generator(random_tensors, generated_masks)
-        #     generated_masks = generated_masks[:, 0]
-        #     inputs = torch.cat((inputs, generated_images), dim=0)
-        #     masks = torch.cat((masks, generated_masks), dim=0)
+        if self.RATIO > 0:
+            random_tensors = get_noise(int(len(inputs)*self.RATIO), self.mask_generator.generator.z_dim, self.device)
+            generated_masks = self.mask_generator.generator(random_tensors)
+            random_tensors = get_noise(int(len(inputs)*self.RATIO), self.image_generator.generator.z_dim, self.device)
+            generated_images  = self.image_generator.generator(random_tensors, generated_masks)
+            generated_masks = generated_masks
+            inputs = torch.cat((inputs, generated_images), dim=0)
+            masks = torch.cat((masks, generated_masks), dim=0)
 
         outputs = self.net(inputs)
+        masks = masks[:, 0:1]
         loss = self.loss_function(outputs, masks.float())
         loss.backward()
         self.optimizer.step()
@@ -490,6 +494,7 @@ class TrainerUNET(TrainerBase):
     def valid_step(self, inputs: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         with torch.no_grad():
             outputs = self.net(inputs)
+            masks = masks[:, 0:1]
             loss = self.loss_function(outputs, masks.float())        
         return loss.item()
     
