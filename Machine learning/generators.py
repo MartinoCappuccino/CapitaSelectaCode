@@ -263,7 +263,9 @@ class VAE(nn.Module):
         
         return recons, mu, logvar
     
-class VAEGAN(nn.Module):
+class VAEGANV2(nn.Module):
+    
+
     def __init__(
         self,
         chs_e  : Tuple[int, int, int, int] = _chs_e,
@@ -296,3 +298,36 @@ class VAEGAN(nn.Module):
         
         return recons, mu, logvar, features_real, features_fake, scores_real, scores_fake
     
+
+class VAEGAN(nn.Module):
+    def __init__(
+        self,
+        chs_e  : Tuple[int, int, int, int] = _chs_e,
+        chs_g  : Tuple[int, int, int, int] = _chs_g,
+        chs_d  : Tuple[int, int, int, int] = _chs_d,
+        layers : Tuple[int, int, int, int] = _layers,
+        z_dim  : int = _z_dim,
+        l      : int = 2,
+        spade  : bool = False,
+        tanh   : bool = True,
+    ):
+        super(VAEGAN, self).__init__()
+        self.encoder = Encoder(chs=chs_e, layers=layers, z_dim=z_dim)
+        self.generator = Generator(chs=chs_g, layers=layers, z_dim=z_dim, spade=spade, tanh=tanh)
+        self.discriminator = Discriminator(chs=chs_d, layers=layers, l=l)
+
+    def forward(self, x, segmap=None, ada_p=0):
+        mu, logvar = self.encoder(x)
+        latent_z = sample_z(mu, logvar)
+        recons = self.generator(latent_z, segmap)
+        
+        features_real = self.discriminator(     x, True)
+        features_fake = self.discriminator(recons, True)
+
+        x      = augment(     x, ada_p)[0] if ada_p > 0 else x
+        recons = augment(recons, ada_p)[0] if ada_p > 0 else recons
+
+        scores_real = self.discriminator(x)
+        scores_fake = self.discriminator(recons)
+        
+        return recons, mu, logvar, features_real, features_fake, scores_real, scores_fake

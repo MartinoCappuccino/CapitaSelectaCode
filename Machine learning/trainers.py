@@ -9,6 +9,7 @@ from utils import dice_loss, DiceBCELoss, accumulate
 from tqdm.auto import tqdm
 from nonleaking import AdaptiveAugment
 
+
 class TrainerBase():
     loss_names : Tuple[str] = ()
     CHECKPOINTS_DIR : str
@@ -120,7 +121,7 @@ class TrainerBase():
 
             avg_losses = 0
             for i in range(len(self.loss_names)):
-                avg_losses += np.asarray(self.valid_losses[i]).mean()
+                avg_losses += np.asarray(self.valid_losses).mean()
             if (avg_losses) < self.minimum_valid_loss + self.TOLERANCE:
                 self.minimum_valid_loss = np.asarray(avg_losses).mean()
                 if epoch > 9:
@@ -128,7 +129,7 @@ class TrainerBase():
                         self.net.cpu().state_dict(),
                         self.CHECKPOINTS_DIR / f"model.pth",
                     )
-
+                    
 class TrainerVAE(TrainerBase):
     loss_names : Tuple[str] = ("Rec_Loss", "KLD")
     def __init__(
@@ -139,10 +140,12 @@ class TrainerVAE(TrainerBase):
             progress_dir,
             train_loader, 
             valid_loader,
+            TOLERANCE = 0.01,
+            minimum_valid_loss = 10,
             device = "cpu",
             seed = 0,
         ):
-        super().__init__(net, progress_dir, train_loader, valid_loader, device, seed)
+        super().__init__(net, progress_dir, train_loader, valid_loader, TOLERANCE, minimum_valid_loss, device, seed)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
         self.kld_annealing_steps = kld_annealing_epochs * len(train_loader)
@@ -204,6 +207,8 @@ class TrainerVAEGAN(TrainerBase):
             progress_dir,
             train_loader, 
             valid_loader,
+            TOLERANCE = 0.01,
+            minimum_valid_loss = 10,
             net_ema = None,
             accum = 0.999,
             gamma = 1.0,
@@ -212,7 +217,7 @@ class TrainerVAEGAN(TrainerBase):
             device = "cpu",
             seed = 0,
         ):
-        super().__init__(net, progress_dir, train_loader, valid_loader, device, seed)
+        super().__init__(net, progress_dir, train_loader, valid_loader, TOLERANCE, minimum_valid_loss, device, seed)
         self.optimizer_enc  = optimizer_enc
         self.optimizer_gen  = optimizer_gen
         self.optimizer_disc = optimizer_disc
@@ -283,7 +288,8 @@ class TrainerVAEGAN(TrainerBase):
             self.r_t_stat = self.ada_augment.r_t_stat
 
         # EMA
-        accumulate(self.net_ema, self.net, self.accum)
+        if self.net_ema is not None:
+            accumulate(self.net_ema, self.net, self.accum)
 
         return rec_loss.item(), kld_loss.item(), discl_loss.item(), adv_loss.item()
     
@@ -330,13 +336,15 @@ class TrainerMaskVAE(TrainerBase):
             progress_dir,
             train_loader, 
             valid_loader,
-            CHECKPOINTS_DIR,
+            TOLERANCE = 0.01,
+            minimum_valid_loss = 10,
+            #CHECKPOINTS_DIR,
             device = "cpu",
         ):
-        super().__init__(net, train_loader, valid_loader, device)
+        super().__init__(net, train_loader, valid_loader, TOLERANCE, minimum_valid_loss, device)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
-        self.CHECKPOINTS_DIR = CHECKPOINTS_DIR
+        #self.CHECKPOINTS_DIR = CHECKPOINTS_DIR
         self.kld_annealing_steps = kld_annealing_epochs * len(train_loader)
         if kld_annealing_epochs == 0:
             self.get_kld_weight = lambda : 1.0
@@ -410,6 +418,8 @@ class TrainerUNET(TrainerBase):
             progress_dir,
             train_loader, 
             valid_loader,
+            TOLERANCE = 0.01,
+            minimum_valid_loss = 10,
             CHECKPOINTS_DIR = None,
             device = "cpu",
         ):
