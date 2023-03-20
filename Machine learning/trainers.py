@@ -5,28 +5,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 from utils import kld_loss, get_noise
 from typing import Tuple, Callable, List, Union
-from utils import dice_loss, DiceBCELoss, accumulate
+from utils import dice_loss, DiceBCELoss, kld_loss, get_noise, accumulate
+from nonleaking import AdaptiveAugment
 from tqdm.auto import tqdm
 from nonleaking import AdaptiveAugment
 
 
 class TrainerBase():
     loss_names : Tuple[str] = ()
-    CHECKPOINTS_DIR : str
     def __init__(
         self,
         net,
-        progress_dir,
         train_loader,
         valid_loader,
+        CHECKPOINTS_DIR,
         TOLERANCE = 0.01,
-        minimum_valid_loss = 10,
+        minimum_valid_loss = 10e6,
         device = "cpu",
         seed = 0,
     ):
         self.net = net
         self.train_loader = train_loader
         self.valid_loader = valid_loader
+        self.CHECKPOINTS_DIR = CHECKPOINTS_DIR
         self.minimum_valid_loss = minimum_valid_loss
         self.TOLERANCE = TOLERANCE
         self.device = device
@@ -37,20 +38,6 @@ class TrainerBase():
 
         # Progress stuff
         np.random.seed(seed)
-
-        self.progress_dir = progress_dir
-
-        indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
-        self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
-        self.x_fixed_t = self.x_fixed_t[:5].to(device)
-        self.y_fixed_t = self.y_fixed_t[:5].to(device)
-
-        indx_v = np.random.choice(np.arange(len(valid_loader.dataset)), size=5, replace=False)
-        self.x_fixed_v, self.y_fixed_v = valid_loader.dataset[indx_v]
-        self.x_fixed_v = self.x_fixed_v[:5].to(device)
-        self.y_fixed_v = self.y_fixed_v[:5].to(device)
-
-        self.z_fixed = get_noise(5, net.generator.z_dim, device)
 
     def train_step(self, images : torch.Tensor, masks : torch.Tensor) -> Tuple[float]:
         raise NotImplementedError
@@ -140,12 +127,13 @@ class TrainerVAE(TrainerBase):
             progress_dir,
             train_loader, 
             valid_loader,
+            CHECKPOINTS_DIR,
             TOLERANCE = 0.01,
-            minimum_valid_loss = 10,
+            minimum_valid_loss = 10e6,
             device = "cpu",
             seed = 0,
         ):
-        super().__init__(net, progress_dir, train_loader, valid_loader, TOLERANCE, minimum_valid_loss, device, seed)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
         self.kld_annealing_steps = kld_annealing_epochs * len(train_loader)
@@ -157,6 +145,18 @@ class TrainerVAE(TrainerBase):
             ).item()
         self.kld_loss_func = kld_loss
         self.rec_loss_func = nn.L1Loss()
+
+        indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
+        self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
+        self.x_fixed_t = self.x_fixed_t[:5].to(device)
+        self.y_fixed_t = self.y_fixed_t[:5].to(device)
+
+        indx_v = np.random.choice(np.arange(len(valid_loader.dataset)), size=5, replace=False)
+        self.x_fixed_v, self.y_fixed_v = valid_loader.dataset[indx_v]
+        self.x_fixed_v = self.x_fixed_v[:5].to(device)
+        self.y_fixed_v = self.y_fixed_v[:5].to(device)
+
+        self.z_fixed = get_noise(5, net.generator.z_dim, device)
 
     def train_step(self, images: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         self.net.zero_grad()
@@ -207,8 +207,9 @@ class TrainerVAEGAN(TrainerBase):
             progress_dir,
             train_loader, 
             valid_loader,
+            CHECKPOINTS_DIR,
             TOLERANCE = 0.01,
-            minimum_valid_loss = 10,
+            minimum_valid_loss = 10e6,
             net_ema = None,
             accum = 0.999,
             gamma = 1.0,
@@ -217,7 +218,7 @@ class TrainerVAEGAN(TrainerBase):
             device = "cpu",
             seed = 0,
         ):
-        super().__init__(net, progress_dir, train_loader, valid_loader, TOLERANCE, minimum_valid_loss, device, seed)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed)
         self.optimizer_enc  = optimizer_enc
         self.optimizer_gen  = optimizer_gen
         self.optimizer_disc = optimizer_disc
@@ -244,6 +245,18 @@ class TrainerVAEGAN(TrainerBase):
         # EMA
         self.accum   = accum
         self.net_ema = net_ema
+
+        indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
+        self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
+        self.x_fixed_t = self.x_fixed_t[:5].to(device)
+        self.y_fixed_t = self.y_fixed_t[:5].to(device)
+
+        indx_v = np.random.choice(np.arange(len(valid_loader.dataset)), size=5, replace=False)
+        self.x_fixed_v, self.y_fixed_v = valid_loader.dataset[indx_v]
+        self.x_fixed_v = self.x_fixed_v[:5].to(device)
+        self.y_fixed_v = self.y_fixed_v[:5].to(device)
+
+        self.z_fixed = get_noise(5, net.generator.z_dim, device)
 
     def train_step(self, images: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         recons, mu, logvar, features_real, features_fake, scores_real, scores_fake = self.net(
@@ -336,15 +349,14 @@ class TrainerMaskVAE(TrainerBase):
             progress_dir,
             train_loader, 
             valid_loader,
-            TOLERANCE = 0.01,
-            minimum_valid_loss = 10,
-            #CHECKPOINTS_DIR,
+            CHECKPOINTS_DIR,
+            TOLERANCE,
+            minimum_valid_loss,
             device = "cpu",
         ):
-        super().__init__(net, train_loader, valid_loader, TOLERANCE, minimum_valid_loss, device)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
-        #self.CHECKPOINTS_DIR = CHECKPOINTS_DIR
         self.kld_annealing_steps = kld_annealing_epochs * len(train_loader)
         if kld_annealing_epochs == 0:
             self.get_kld_weight = lambda : 1.0
@@ -418,41 +430,54 @@ class TrainerUNET(TrainerBase):
             progress_dir,
             train_loader, 
             valid_loader,
+            mask_generator,
+            image_generator,
+            RATIO,
             TOLERANCE = 0.01,
             minimum_valid_loss = 10,
             CHECKPOINTS_DIR = None,
             device = "cpu",
         ):
-        super().__init__(net, train_loader, valid_loader, device)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
+
         self.loss_function = DiceBCELoss()
-        self.CHECKPOINTS_DIR = CHECKPOINTS_DIR
 
         # Progress stuff
         self.progress_dir = progress_dir
+        self.mask_generator = mask_generator
+        self.image_generator = image_generator
+        self.RATIO = RATIO
 
-        self.image_fixed_t = next(iter(train_loader))[0]
-        self.image_fixed_t = self.image_fixed_t[:5].to(device)
+        indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
+        self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
+        self.x_fixed_t = self.x_fixed_t[:5].to(device)
+        self.y_fixed_t = self.y_fixed_t[:5].to(device)
 
-        self.mask_fixed_t = next(iter(train_loader))[1]
-        self.mask_fixed_t = self.mask_fixed_t[:5].to(device)
+        indx_v = np.random.choice(np.arange(len(valid_loader.dataset)), size=5, replace=False)
+        self.x_fixed_v, self.y_fixed_v = valid_loader.dataset[indx_v]
+        self.x_fixed_v = self.x_fixed_v[:5].to(device)
+        self.y_fixed_v = self.y_fixed_v[:5].to(device)
 
-        self.mask_fixed_v = next(iter(valid_loader))[1]
-        self.mask_fixed_v = self.mask_fixed_v[:5].to(device)
-
-        self.image_fixed_v = next(iter(train_loader))[0]
-        self.image_fixed_v = self.image_fixed_v[:5].to(device)
-
-    def train_step(self, inputs, masks: torch.Tensor) -> Tuple[float]:
+    def train_step(self, inputs: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         self.net.zero_grad()
+        if self.RATIO > 0:
+            random_tensors = get_noise(int(len(inputs)*self.RATIO), self.mask_generator.generator.z_dim, self.device)
+            generated_masks = self.mask_generator.generator(random_tensors)
+            random_tensors = get_noise(int(len(inputs)*self.RATIO), self.image_generator.generator.z_dim, self.device)
+            generated_images  = self.image_generator.generator(random_tensors, generated_masks)
+
+        inputs = torch.cat((inputs, generated_images), dim=0)
+        masks = torch.cat((masks, generated_masks), dim=0)
+
         outputs = self.net(inputs)
         loss = self.loss_function(outputs, masks.float())
         loss.backward()
         self.optimizer.step()
         return loss.item()
     
-    def valid_step(self, inputs, masks: torch.Tensor) -> Tuple[float]:
+    def valid_step(self, inputs: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         with torch.no_grad():
             outputs = self.net(inputs)
             loss = self.loss_function(outputs, masks.float())        
@@ -460,16 +485,16 @@ class TrainerUNET(TrainerBase):
     
     def save_progress_image(self, epoch):
         with torch.no_grad():
-            recons_train = self.net(self.image_fixed_t)[0]
+            recons_train = self.net(self.x_fixed_t)[0]
             recons_train = recons_train/2.0 + 0.5 
-            recons_valid = self.net(self.image_fixed_v)[0]
+            recons_valid = self.net(self.x_fixed_v)[0]
             recons_valid = recons_valid/2.0 + 0.5
 
             img_grid = make_grid(
                 torch.cat([
-                    self.mask_fixed_t.cpu(), 
+                    self.y_fixed_t.cpu(), 
                     recons_train.cpu(),
-                    self.mask_fixed_v.cpu(), 
+                    self.y_fixed_v.cpu(), 
                     recons_valid.cpu(), 
                 ]), 
                 nrow=5, 

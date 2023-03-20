@@ -150,7 +150,7 @@ class ProstateMRUNETDataset(torch.utils.data.Dataset):
         size of images to be interpolated to
     """
 
-    def __init__(self, paths, img_size, mask_generator, image_generator, ratio, validation=True):
+    def __init__(self, paths, img_size):
         self.images = []
         self.labels = []
         # load images  
@@ -172,19 +172,11 @@ class ProstateMRUNETDataset(torch.utils.data.Dataset):
 
             mask = F.interpolate(mask, size=img_size, mode='nearest')
             mask[:,1] = 1 - mask[:,1]
-            #assert img.shape[0] == mask.shape[0]
             self.images.append(img)
-            self.labels.append(mask)
+            self.labels.append(mask[:,0])
 
         self.images = torch.cat(self.images, dim=0)
         self.labels = torch.cat(self.labels, dim=0)
-
-        if validation == False:
-            for i in range(int(len(self.images)*ratio)):
-                new_mask = mask_generator(self.labels[i])
-                new_image = image_generator(new_mask)
-                self.images = torch.cat(new_image, dim=0)
-                self.labels = torch.cat(new_mask, dim=0)
 
     def __len__(self):
         """Returns length of dataset"""
