@@ -8,8 +8,7 @@ from typing import Tuple, Callable, List, Union
 from utils import dice_loss, DiceBCELoss, kld_loss, get_noise, accumulate
 from nonleaking import AdaptiveAugment
 from tqdm.auto import tqdm
-from nonleaking import AdaptiveAugment
-
+import os
 
 class TrainerBase():
     loss_names : Tuple[str] = ()
@@ -86,7 +85,8 @@ class TrainerBase():
         self.schedulers = [torch.optim.lr_scheduler.LambdaLR(optimizer, lambda_lr) 
                            for optimizer in self.optimizers]
         self.num_epochs = num_epochs
-        self.nstep = 0
+        self.nstep=0
+        no_increase = 0
         for epoch in range(num_epochs):
             train_losses = self.train_epoch()
             valid_losses = self.valid_epoch()
@@ -106,16 +106,21 @@ class TrainerBase():
             if (epoch + 1) % display_freq == 0:
                 self.save_progress_image(epoch)
 
-            avg_losses = 0
-            for i in range(len(self.loss_names)):
-                avg_losses += np.asarray(self.valid_losses).mean()
-            if (avg_losses) < self.minimum_valid_loss + self.TOLERANCE:
-                self.minimum_valid_loss = np.asarray(avg_losses).mean()
-                if epoch > 9:
-                    torch.save(
-                        self.net.cpu().state_dict(),
-                        self.CHECKPOINTS_DIR / f"model.pth",
-                    )
+            avg_losses = np.asarray(valid_losses).mean()
+            if (avg_losses.sum()) < self.minimum_valid_loss + self.TOLERANCE:
+                no_increase = 0
+                self.minimum_valid_loss = avg_losses.sum()
+                if os.path.exists(self.CHECKPOINTS_DIR / f"model.pth"):
+                    os.remove( self.CHECKPOINTS_DIR / f"model.pth")
+                torch.save(
+                    self.net.cpu().state_dict(),
+                    self.CHECKPOINTS_DIR / f"model.pth",
+                )
+            else:
+                no_increase +=1
+                if no_increase > 9:
+                    break
+
                     
 class TrainerVAE(TrainerBase):
     loss_names : Tuple[str] = ("Rec_Loss", "KLD")
@@ -145,6 +150,8 @@ class TrainerVAE(TrainerBase):
             ).item()
         self.kld_loss_func = kld_loss
         self.rec_loss_func = nn.L1Loss()
+
+        self.progress_dir = progress_dir
 
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
@@ -235,6 +242,7 @@ class TrainerVAEGAN(TrainerBase):
         self.discl_loss_func = nn.MSELoss()
         self.adv_loss_func   = nn.BCEWithLogitsLoss()
         self.gamma = gamma
+        self.progress_dir = progress_dir
 
         # ADA stuff
         self.ada_p = 0
@@ -353,8 +361,9 @@ class TrainerMaskVAE(TrainerBase):
             TOLERANCE,
             minimum_valid_loss,
             device = "cpu",
+            seed = 0
         ):
-        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
         self.kld_annealing_steps = kld_annealing_epochs * len(train_loader)
@@ -437,8 +446,9 @@ class TrainerUNET(TrainerBase):
             minimum_valid_loss = 10,
             CHECKPOINTS_DIR = None,
             device = "cpu",
+            seed = 0
         ):
-        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
 
@@ -452,24 +462,24 @@ class TrainerUNET(TrainerBase):
 
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
-        self.x_fixed_t = self.x_fixed_t[:5].to(device)
-        self.y_fixed_t = self.y_fixed_t[:5].to(device)
+        self.x_fixed_t = self.x_fixed_t.to(device)
+        self.y_fixed_t = self.y_fixed_t.to(device)
 
         indx_v = np.random.choice(np.arange(len(valid_loader.dataset)), size=5, replace=False)
         self.x_fixed_v, self.y_fixed_v = valid_loader.dataset[indx_v]
-        self.x_fixed_v = self.x_fixed_v[:5].to(device)
-        self.y_fixed_v = self.y_fixed_v[:5].to(device)
+        self.x_fixed_v = self.x_fixed_v.to(device)
+        self.y_fixed_v = self.y_fixed_v.to(device)
 
     def train_step(self, inputs: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         self.net.zero_grad()
-        if self.RATIO > 0:
-            random_tensors = get_noise(int(len(inputs)*self.RATIO), self.mask_generator.generator.z_dim, self.device)
-            generated_masks = self.mask_generator.generator(random_tensors)
-            random_tensors = get_noise(int(len(inputs)*self.RATIO), self.image_generator.generator.z_dim, self.device)
-            generated_images  = self.image_generator.generator(random_tensors, generated_masks)
-
-        inputs = torch.cat((inputs, generated_images), dim=0)
-        masks = torch.cat((masks, generated_masks), dim=0)
+        # if self.RATIO > 0:
+        #     random_tensors = get_noise(int(len(inputs)*self.RATIO), self.mask_generator.generator.z_dim, self.device)
+        #     generated_masks = self.mask_generator.generator(random_tensors)
+        #     random_tensors = get_noise(int(len(inputs)*self.RATIO), self.image_generator.generator.z_dim, self.device)
+        #     generated_images  = self.image_generator.generator(random_tensors, generated_masks)
+        #     generated_masks = generated_masks[:, 0]
+        #     inputs = torch.cat((inputs, generated_images), dim=0)
+        #     masks = torch.cat((masks, generated_masks), dim=0)
 
         outputs = self.net(inputs)
         loss = self.loss_function(outputs, masks.float())
@@ -485,10 +495,8 @@ class TrainerUNET(TrainerBase):
     
     def save_progress_image(self, epoch):
         with torch.no_grad():
-            recons_train = self.net(self.x_fixed_t)[0]
-            recons_train = recons_train/2.0 + 0.5 
-            recons_valid = self.net(self.x_fixed_v)[0]
-            recons_valid = recons_valid/2.0 + 0.5
+            recons_train = torch.round(torch.sigmoid(self.net(self.x_fixed_t)))
+            recons_valid = torch.round(torch.sigmoid(self.net(self.x_fixed_v)))
 
             img_grid = make_grid(
                 torch.cat([

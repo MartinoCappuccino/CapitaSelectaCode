@@ -128,6 +128,7 @@ class ProstateMRDataset(torch.utils.data.Dataset):
             #assert img.shape[0] == mask.shape[0]
             self.images.append(img)
             self.labels.append(mask)
+
         self.images = torch.cat(self.images, dim=0)
         self.labels = torch.cat(self.labels, dim=0)
 
@@ -173,7 +174,7 @@ class ProstateMRUNETDataset(torch.utils.data.Dataset):
             mask = F.interpolate(mask, size=img_size, mode='nearest')
             mask[:,1] = 1 - mask[:,1]
             self.images.append(img)
-            self.labels.append(mask[:,0])
+            self.labels.append(mask[:,0:1])
 
         self.images = torch.cat(self.images, dim=0)
         self.labels = torch.cat(self.labels, dim=0)
