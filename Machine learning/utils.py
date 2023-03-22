@@ -61,9 +61,11 @@ class ProstateMRDataset(torch.utils.data.Dataset):
         size of images to be interpolated to
     """
 
-    def __init__(self, paths, img_size, empty_masks = False):
+    def __init__(self, paths, img_size, empty_masks = False, transform = None):
         self.images = []
         self.labels = []
+        self.transform = transform
+        
         if empty_masks == True: 
             prostaat = "new_prostaat.mhd"
         else: 
@@ -101,6 +103,11 @@ class ProstateMRDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         images = self.images[index]
         labels = self.labels[index]
+        
+        if self.transform is not None: 
+            images = self.transform(images)
+            labels = self.transform(labels)
+            
         return images, labels
 
 class DiceBCELoss(nn.Module):

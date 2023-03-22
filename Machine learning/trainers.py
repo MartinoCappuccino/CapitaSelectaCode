@@ -9,6 +9,7 @@ from utils import dice_loss, DiceBCELoss, kld_loss, get_noise, accumulate
 from nonleaking import AdaptiveAugment
 from tqdm.auto import tqdm
 import os
+from utils import sample_z
 
 class TrainerBase():
     loss_names : Tuple[str] = ()
@@ -380,9 +381,15 @@ class TrainerMaskVAE(TrainerBase):
         self.progress_dir = progress_dir
 
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
+        indx_t_next = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
+        
         self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
         self.x_fixed_t = self.x_fixed_t.to(device)
         self.y_fixed_t = self.y_fixed_t.to(device)
+        
+        self.x_next_t, self.y_next_t = train_loader.dataset[indx_t_next]
+        self.x_next_t = self.x_next_t.to(device)
+        self.y_next_t = self.y_next_t.to(device)
 
         indx_v = np.random.choice(np.arange(len(valid_loader.dataset)), size=5, replace=False)
         self.x_fixed_v, self.y_fixed_v = valid_loader.dataset[indx_v]
@@ -416,7 +423,16 @@ class TrainerMaskVAE(TrainerBase):
             recons_train = recons_train/2.0 + 0.5 
             recons_valid = self.net(self.y_fixed_v)[0]
             recons_valid = recons_valid/2.0 + 0.5
-            generations  = self.net.generator(self.z_fixed)
+            
+            mu_first, logvar_first = self.net.encoder(self.y_fixed_t)
+            latent_z_first = sample_z(mu_first, logvar_first)
+            
+            mu_second, logvar_second = self.net.encoder(self.y_next_t)
+            latent_z_second = sample_z(mu_second, logvar_second)
+            
+            gen_latent_z = latent_z_first + ((latent_z_second - latent_z_first)/2)
+            generations  = self.net.generator(gen_latent_z)
+            #generations  = self.net.generator(self.z_fixed)
             generations  = generations/2.0 + 0.5 
 
             img_grid = make_grid(
@@ -497,6 +513,7 @@ class TrainerUNET(TrainerBase):
             masks = masks[:, 0:1]
             loss = self.loss_function(outputs, masks.float())        
         return loss.item()
+    
     
     def save_progress_image(self, epoch):
         with torch.no_grad():
