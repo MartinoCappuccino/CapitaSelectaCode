@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from utils import kld_loss, get_noise
 from typing import Tuple, Callable, List, Union
-from utils import dice_loss, DiceBCELoss, kld_loss, get_noise, accumulate
+from utils import dice_loss, DiceBCELoss, kld_loss, get_noise, accumulate, get_kl_weight
 from nonleaking import AdaptiveAugment
 from tqdm.auto import tqdm
 import os
