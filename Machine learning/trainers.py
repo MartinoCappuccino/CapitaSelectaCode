@@ -23,6 +23,7 @@ class TrainerBase():
         minimum_valid_loss = 10e6,
         device = "cpu",
         seed = 0,
+        early_stopping = False,
     ):
         self.net = net
         self.train_loader = train_loader
@@ -30,6 +31,7 @@ class TrainerBase():
         self.CHECKPOINTS_DIR = CHECKPOINTS_DIR
         self.minimum_valid_loss = minimum_valid_loss
         self.TOLERANCE = TOLERANCE
+        self.early_stopping = early_stopping
         self.device = device
 
         self.optimizers : List[torch.optim.Optimizer] 
@@ -107,10 +109,11 @@ class TrainerBase():
             if (epoch + 1) % display_freq == 0:
                 self.save_progress_image(epoch)
 
-            avg_losses = np.asarray(valid_losses).mean()
-            if (avg_losses.sum()) < self.minimum_valid_loss + self.TOLERANCE:
+            avg_losses = valid_losses[0]
+
+            if (avg_losses) < self.minimum_valid_loss + self.TOLERANCE:
                 no_increase = 0
-                self.minimum_valid_loss = avg_losses.sum()
+                self.minimum_valid_loss = avg_losses
                 if os.path.exists(self.CHECKPOINTS_DIR / f"model.pth"):
                     os.remove( self.CHECKPOINTS_DIR / f"model.pth")
                 torch.save(
@@ -119,8 +122,9 @@ class TrainerBase():
                 )
             else:
                 no_increase +=1
-                #if no_increase > 9:
-                 #   break
+                if self.early_stopping:
+                    if no_increase > 9:
+                        break
 
                     
 class TrainerVAE(TrainerBase):
@@ -138,8 +142,9 @@ class TrainerVAE(TrainerBase):
             minimum_valid_loss = 10e6,
             device = "cpu",
             seed = 0,
+            early_stopping = False
         ):
-        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed, early_stopping)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
         self.kld_annealing_steps = kld_annealing_epochs * len(train_loader)
@@ -153,9 +158,9 @@ class TrainerVAE(TrainerBase):
         self.rec_loss_func = nn.L1Loss()
 
         self.progress_dir = progress_dir
-        
+
         np.random.seed(seed)
-        
+
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
         self.x_fixed_t = self.x_fixed_t[:5].to(device)
@@ -227,8 +232,9 @@ class TrainerVAEGAN(TrainerBase):
             ada_length = 10000,
             device = "cpu",
             seed = 0,
+            early_stopping = False
         ):
-        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed, early_stopping)
         self.optimizer_enc  = optimizer_enc
         self.optimizer_gen  = optimizer_gen
         self.optimizer_disc = optimizer_disc
@@ -256,9 +262,9 @@ class TrainerVAEGAN(TrainerBase):
         # EMA
         self.accum   = accum
         self.net_ema = net_ema
-        
+
         np.random.seed(seed)
-        
+
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         indx_t_next = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         
@@ -381,9 +387,10 @@ class TrainerMaskVAE(TrainerBase):
             TOLERANCE=0.01,
             minimum_valid_loss=10e8,
             device = "cpu",
-            seed = 0
+            seed = 0,
+            early_stopping = False
         ):
-        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed, early_stopping)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
         self.kld_annealing_steps = kld_annealing_epochs * len(train_loader)
@@ -398,6 +405,8 @@ class TrainerMaskVAE(TrainerBase):
 
         # Progress stuff
         self.progress_dir = progress_dir
+
+        np.random.seed(seed)
 
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         indx_t_next = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
@@ -479,14 +488,15 @@ class TrainerUNET(TrainerBase):
             valid_loader,
             mask_generator,
             image_generator,
-            RATIO,
             TOLERANCE = 0.01,
             minimum_valid_loss = 10,
+            Number_of_fake = 0,
             CHECKPOINTS_DIR = None,
             device = "cpu",
-            seed = 0
+            seed = 0,
+            early_stopping = True
         ):
-        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed)
+        super().__init__(net, train_loader, valid_loader, CHECKPOINTS_DIR, TOLERANCE, minimum_valid_loss, device, seed, early_stopping)
         self.optimizer = optimizer
         self.optimizers = [self.optimizer]
 
@@ -496,7 +506,9 @@ class TrainerUNET(TrainerBase):
         self.progress_dir = progress_dir
         self.mask_generator = mask_generator
         self.image_generator = image_generator
-        self.RATIO = RATIO
+        self.Number_of_fake = Number_of_fake
+
+        np.random.seed(seed)
 
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
@@ -510,12 +522,14 @@ class TrainerUNET(TrainerBase):
 
     def train_step(self, inputs: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         self.net.zero_grad()
-        if self.RATIO > 0:
-            random_tensors = get_noise(int(len(inputs)*self.RATIO), self.mask_generator.generator.z_dim, self.device)
+        if self.Number_of_fake > 0:
+            random_tensors = get_noise(self.Number_of_fake, self.mask_generator.generator.z_dim, self.device)
             generated_masks = self.mask_generator.generator(random_tensors)
-            random_tensors = get_noise(int(len(inputs)*self.RATIO), self.image_generator.generator.z_dim, self.device)
+            generated_masks = generated_masks * (torch.rand(generated_masks.shape[0]) > 0.1)
+            generated_masks = generated_masks[:, None].repeat_interleave(2, dim=1)
+            generated_masks[:,1] = 1 - generated_masks[:,1]
+            random_tensors = get_noise(self.Number_of_fake, self.image_generator.generator.z_dim, self.device)
             generated_images  = self.image_generator.generator(random_tensors, generated_masks)
-            generated_masks = generated_masks
             inputs = torch.cat((inputs, generated_images), dim=0)
             masks = torch.cat((masks, generated_masks), dim=0)
 
