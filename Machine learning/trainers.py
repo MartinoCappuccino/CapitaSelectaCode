@@ -119,8 +119,8 @@ class TrainerBase():
                 )
             else:
                 no_increase +=1
-                if no_increase > 9:
-                    break
+                #if no_increase > 9:
+                 #   break
 
                     
 class TrainerVAE(TrainerBase):
@@ -256,14 +256,20 @@ class TrainerVAEGAN(TrainerBase):
         self.net_ema = net_ema
 
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
+        indx_t_next = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
+        
         self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
-        self.x_fixed_t = self.x_fixed_t[:5].to(device)
-        self.y_fixed_t = self.y_fixed_t[:5].to(device)
+        self.x_fixed_t = self.x_fixed_t.to(device)
+        self.y_fixed_t = self.y_fixed_t.to(device)
+        
+        self.x_next_t, self.y_next_t = train_loader.dataset[indx_t_next]
+        self.x_next_t = self.x_next_t.to(device)
+        self.y_next_t = self.y_next_t.to(device)
 
         indx_v = np.random.choice(np.arange(len(valid_loader.dataset)), size=5, replace=False)
         self.x_fixed_v, self.y_fixed_v = valid_loader.dataset[indx_v]
-        self.x_fixed_v = self.x_fixed_v[:5].to(device)
-        self.y_fixed_v = self.y_fixed_v[:5].to(device)
+        self.x_fixed_v = self.x_fixed_v.to(device)
+        self.y_fixed_v = self.y_fixed_v.to(device)
 
         self.z_fixed = get_noise(5, net.generator.z_dim, device)
 
@@ -332,7 +338,16 @@ class TrainerVAEGAN(TrainerBase):
             net.eval()
             recons_train = net(self.x_fixed_t, self.y_fixed_t)[0]
             recons_valid = net(self.x_fixed_v, self.y_fixed_v)[0]
-            generations  = net.generator(self.z_fixed, self.y_fixed_v)
+            
+            mu_first, logvar_first = self.net.encoder(self.x_fixed_t)
+            latent_z_first = sample_z(mu_first, logvar_first)
+            
+            mu_second, logvar_second = self.net.encoder(self.x_next_t)
+            latent_z_second = sample_z(mu_second, logvar_second)
+            
+            gen_latent_z = latent_z_first + (0.5*(latent_z_second - latent_z_first))
+            generations  = self.net.generator(gen_latent_z, self.y_fixed_v)
+            #generations  = net.generator(self.z_fixed, self.y_fixed_v)
 
             img_grid = make_grid(
                 torch.cat([
