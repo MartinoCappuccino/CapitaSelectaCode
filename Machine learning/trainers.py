@@ -387,7 +387,7 @@ class TrainerMaskVAE(TrainerBase):
             valid_loader,
             CHECKPOINTS_DIR,
             TOLERANCE=0.01,
-            minimum_valid_loss=10e8,
+            minimum_valid_loss=10e6,
             device = "cpu",
             seed = 0,
             early_stopping = False
@@ -492,7 +492,7 @@ class TrainerUNET(TrainerBase):
             mask_generator,
             image_generator,
             TOLERANCE = 0.01,
-            minimum_valid_loss = 10,
+            minimum_valid_loss = 10e6,
             Number_of_fake = 0,
             CHECKPOINTS_DIR = None,
             device = "cpu",
