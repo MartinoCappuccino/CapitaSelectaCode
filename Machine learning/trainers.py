@@ -151,9 +151,10 @@ class TrainerVAE(TrainerBase):
         if kld_annealing_epochs == 0:
             self.get_kld_weight = lambda : 1.0
         else:
-            self.get_kld_weight = lambda : torch.sigmoid(
-                torch.tensor(self.nstep/self.kld_annealing_steps * 12 - 6)
-            ).item()
+#             self.get_kld_weight = lambda : torch.sigmoid(
+#                 torch.tensor(self.nstep/self.kld_annealing_steps * 12 - 6)
+#             ).item()
+            self.get_kld_weight = lambda : get_kl_weight(self.nstep, self.kld_annealing_steps)
         self.kld_loss_func = kld_loss
         self.rec_loss_func = nn.L1Loss()
 
@@ -243,9 +244,10 @@ class TrainerVAEGAN(TrainerBase):
         if kld_annealing_epochs == 0:
             self.get_kld_weight = lambda : 1.0
         else:
-            self.get_kld_weight = lambda : torch.sigmoid(
-                torch.tensor(self.nstep/self.kld_annealing_steps * 12 - 6)
-            ).item()
+#             self.get_kld_weight = lambda : torch.sigmoid(
+#                 torch.tensor(self.nstep/self.kld_annealing_steps * 12 - 6)
+#             ).item()
+            self.get_kld_weight = lambda : get_kl_weight(self.nstep, self.kld_annealing_steps)
         self.kld_loss_func   = kld_loss
         self.rec_loss_func   = nn.L1Loss()
         self.discl_loss_func = nn.MSELoss()
@@ -397,9 +399,10 @@ class TrainerMaskVAE(TrainerBase):
         if kld_annealing_epochs == 0:
             self.get_kld_weight = lambda : 1.0
         else:
-            self.get_kld_weight = lambda : torch.sigmoid(
-                torch.tensor(self.nstep/self.kld_annealing_steps * 12 - 6)
-            ).item()
+#             self.get_kld_weight = lambda : torch.sigmoid(
+#                 torch.tensor(self.nstep/self.kld_annealing_steps * 12 - 6)
+#             ).item()
+            self.get_kld_weight = lambda : get_kl_weight(self.nstep, self.kld_annealing_steps)
         self.kld_loss_func = kld_loss
         self.rec_loss_func = dice_loss
 
