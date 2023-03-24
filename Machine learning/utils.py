@@ -152,3 +152,11 @@ class DiceBCELoss(nn.Module):
         BCE = nn.functional.binary_cross_entropy(outputs, targets, reduction="mean")
 
         return BCE + dice_loss
+
+    
+def get_kl_weight(step, half_period=1_000):
+    x = step / half_period
+    f = -np.sin(np.pi * (x-1.))
+    g = (np.cos(np.pi * (x-1.)) + 1.) / 2.
+    h = ((np.sign(f) + 1.) / 2.) * (g - 1.) + 1.
+    return h
