@@ -153,7 +153,9 @@ class TrainerVAE(TrainerBase):
         self.rec_loss_func = nn.L1Loss()
 
         self.progress_dir = progress_dir
-
+        
+        np.random.seed(seed)
+        
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
         self.x_fixed_t = self.x_fixed_t[:5].to(device)
@@ -254,7 +256,9 @@ class TrainerVAEGAN(TrainerBase):
         # EMA
         self.accum   = accum
         self.net_ema = net_ema
-
+        
+        np.random.seed(seed)
+        
         indx_t = np.random.choice(np.arange(len(train_loader.dataset)), size=5, replace=False)
         self.x_fixed_t, self.y_fixed_t = train_loader.dataset[indx_t]
         self.x_fixed_t = self.x_fixed_t[:5].to(device)
