@@ -485,9 +485,6 @@ class TrainerUNET(TrainerBase):
             inputs = torch.cat((inputs, generated_images), dim=0)
             masks = torch.cat((masks, generated_masks), dim=0)
 
-        
-
-
         outputs = self.net(inputs)
         masks = masks[:, 0:1]
         loss = self.loss_function(outputs, masks.float())
