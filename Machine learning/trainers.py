@@ -459,32 +459,33 @@ class TrainerUNET(TrainerBase):
     def train_step(self, inputs: torch.Tensor, masks: torch.Tensor) -> Tuple[float]:
         self.net.zero_grad()
         if self.Number_of_fake > 0:
-            indx_t = np.random.choice(np.arange(len(self.mask_loader.dataset)), size=self.Number_of_fake, replace=False)
-            inputimages1, inputmasks1 = self.mask_loader.dataset[indx_t]
-            inputmasks1 = inputmasks1[:, 0:1].to(self.device)
-            indx_t = np.random.choice(np.arange(len(self.mask_loader.dataset)), size=self.Number_of_fake, replace=False)
-            inputimages2, inputmasks2 = self.mask_loader.dataset[indx_t]
-            inputmasks2 = inputmasks2[:, 0:1].to(self.device)
-            gen_latent_z = self.interpolate(self.mask_generator, inputmasks1, inputmasks2) 
-            generated_masks = self.mask_generator.generator(gen_latent_z)/2 + 0.5
-            generated_masks = generated_masks * (torch.rand((generated_masks.shape[0],)).to(self.device) > 0.3)[:,None,None,None]
-            #generated_masks[0:int(0.3*generated_masks.shape[0]), :] = 0
-            generated_masks = generated_masks[:].repeat_interleave(2, dim=1)
-            generated_masks[:,1] = 1 - generated_masks[:,1]
-            generated_masks = generated_masks.to(self.device)
-            
-            indx_t = np.random.choice(np.arange(len(self.train_loader.dataset)), size=self.Number_of_fake, replace=False)
-            inputimages1, inputmasks1 = self.train_loader.dataset[indx_t]
-            inputimages1 = inputimages1.to(self.device)
-            indx_t = np.random.choice(np.arange(len(self.train_loader.dataset)), size=self.Number_of_fake, replace=False)
-            inputimages2, inputmasks2 = self.train_loader.dataset[indx_t]
-            inputimages2 = inputimages2.to(self.device)
-            gen_latent_z = self.interpolate(self.image_generator, inputimages1, inputimages2)
-            generated_images  = self.image_generator.generator(gen_latent_z, generated_masks)
-            generated_images = generated_images.to(self.device)
-            
-            inputs = torch.cat((inputs, generated_images), dim=0)
-            masks = torch.cat((masks, generated_masks), dim=0)
+            with torch.no_grad():
+                indx_t = np.random.choice(np.arange(len(self.mask_loader.dataset)), size=self.Number_of_fake, replace=False)
+                inputimages1, inputmasks1 = self.mask_loader.dataset[indx_t]
+                inputmasks1 = inputmasks1[:, 0:1].to(self.device)
+                indx_t = np.random.choice(np.arange(len(self.mask_loader.dataset)), size=self.Number_of_fake, replace=False)
+                inputimages2, inputmasks2 = self.mask_loader.dataset[indx_t]
+                inputmasks2 = inputmasks2[:, 0:1].to(self.device)
+                gen_latent_z = self.interpolate(self.mask_generator, inputmasks1, inputmasks2) 
+                generated_masks = self.mask_generator.generator(gen_latent_z)/2 + 0.5
+                generated_masks = generated_masks * (torch.rand((generated_masks.shape[0],)).to(self.device) > 0.3)[:,None,None,None]
+                #generated_masks[0:int(0.3*generated_masks.shape[0]), :] = 0
+                generated_masks = generated_masks[:].repeat_interleave(2, dim=1)
+                generated_masks[:,1] = 1 - generated_masks[:,1]
+                generated_masks = generated_masks.to(self.device)
+
+                indx_t = np.random.choice(np.arange(len(self.train_loader.dataset)), size=self.Number_of_fake, replace=False)
+                inputimages1, inputmasks1 = self.train_loader.dataset[indx_t]
+                inputimages1 = inputimages1.to(self.device)
+                indx_t = np.random.choice(np.arange(len(self.train_loader.dataset)), size=self.Number_of_fake, replace=False)
+                inputimages2, inputmasks2 = self.train_loader.dataset[indx_t]
+                inputimages2 = inputimages2.to(self.device)
+                gen_latent_z = self.interpolate(self.image_generator, inputimages1, inputimages2)
+                generated_images  = self.image_generator.generator(gen_latent_z, generated_masks)
+                generated_images = generated_images.to(self.device)
+
+                inputs = torch.cat((inputs, generated_images), dim=0)
+                masks = torch.cat((masks, generated_masks), dim=0)
 
         outputs = self.net(inputs)
         masks = masks[:, 0:1]
