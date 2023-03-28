@@ -124,6 +124,11 @@ class TrainerBase():
                 no_increase +=1
                 if no_increase > 9:
                     break
+        torch.save(
+            self.net.state_dict(),
+            self.CHECKPOINTS_DIR / f"last_model.pth",
+        )
+       
       
 
                     
