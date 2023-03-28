@@ -1,2 +1,8 @@
 __pycache__/
+<<<<<<< Updated upstream
 .ipynb_checkpoints/
+=======
+.ipynb_checkpoints/
+visualize_all_data.py
+opendata/open_data.ipynb
+>>>>>>> Stashed changes
