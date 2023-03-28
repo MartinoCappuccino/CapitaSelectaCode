@@ -110,27 +110,21 @@ class TrainerBase():
                 self.save_progress_image(epoch)
 
             avg_losses = valid_losses[0]
-            if self.early_stopping:
-                if (avg_losses) < self.minimum_valid_loss + self.TOLERANCE:
-                    no_increase = 0
-                    self.minimum_valid_loss = avg_losses
-                    if os.path.exists(self.CHECKPOINTS_DIR / f"model.pth"):
-                        os.remove( self.CHECKPOINTS_DIR / f"model.pth")
-                    torch.save(
-                        self.net.state_dict(),
-                        self.CHECKPOINTS_DIR / f"model.pth",
-                    )
-                else:
-                    no_increase +=1
-                    if no_increase > 9:
-                        break
-            else:
+            
+            if (avg_losses) < self.minimum_valid_loss + self.TOLERANCE:
+                no_increase = 0
+                self.minimum_valid_loss = avg_losses
                 if os.path.exists(self.CHECKPOINTS_DIR / f"model.pth"):
-                        os.remove( self.CHECKPOINTS_DIR / f"model.pth")
+                    os.remove( self.CHECKPOINTS_DIR / f"model.pth")
                 torch.save(
                     self.net.state_dict(),
                     self.CHECKPOINTS_DIR / f"model.pth",
                 )
+            elif self.early_stopping:
+                no_increase +=1
+                if no_increase > 9:
+                    break
+      
 
                     
 class TrainerVAEGAN(TrainerBase):
