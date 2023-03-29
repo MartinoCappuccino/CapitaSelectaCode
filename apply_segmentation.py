@@ -46,8 +46,8 @@ for i in patients:
     else:
         train_split.append(i)
         
-print(train_split)
-print(validation_split)
+# print(train_split)
+# print(validation_split)
 
 # split in training/validation after shuffling
 partition = {
@@ -84,3 +84,43 @@ with torch.no_grad():
     ax[2].set_title("Prediction")
     ax[2].axis("off")
     plt.show()
+ 
+
+# Contours 
+
+slice_list = [10,30,50,70]
+
+
+fig, axs = plt.subplots(nrows=1, ncols=4, figsize=(10, 7))
+plt.subplots_adjust(wspace =0.1 , hspace=0.1)
+fig.suptitle("Contours for different slices of validation", fontsize=18, y=0.8)
+
+for slic, ax in zip(range(len(slice_list)), axs.ravel()):
+    slice_nr = slice_list[slic]
+    
+    with torch.no_grad():
+        predict_index = slice_nr
+        (input, target) = valid_dataset[predict_index]
+        output = torch.sigmoid(unet_model(input[np.newaxis, ...]))
+        prediction = torch.round(output)
+
+    gt_1 = target[0]
+    
+    ax.imshow(gt_1, cmap='gray')
+    c1 = ax.contour(prediction[0,0], colors=['red'], linewidths=1.1)
+    
+    if slice_nr == 10:
+        h1,l1 = c1.legend_elements()
+        
+        ax.legend([h1[0]], ['prediction'], loc='lower left')
+
+
+for i, ax in enumerate(fig.axes):
+    ax.set_yticklabels([])
+    ax.set_xticklabels([])
+    ax.axis('off')
+    ax.set_title('Slice ' + str(slice_list[i]), fontsize=16) 
+    
+
+plt.show()
+##fig.savefig(os.path.join(data_dir, 'results', experiment, val_patient, 'plot_contours.png'), dpi=200)
