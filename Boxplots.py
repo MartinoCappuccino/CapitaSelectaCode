@@ -6,9 +6,10 @@ Created on Thu Mar 30 10:28:34 2023
 """
 import matplotlib.pyplot as plt
 import statistics as st
+from scipy import stats
 
 score0 = []
-score = "HD"
+score = "DICE"
 with open("{x}_0.txt".format(x=score), "r") as f:
   for line in f:
       x = (line.strip())
@@ -78,24 +79,31 @@ with open("{x}_32.txt".format(x=score), "r") as f:
 # = [0,0,0]
 score24 = [0,0,0]
 
+boxprops = dict(linestyle='-', linewidth=5, color='steelblue')
+whiskerprops = dict(linestyle='-', linewidth=5, color='steelblue')
+capprops = dict(linestyle='-', linewidth=5, color='black')
+medianprops = dict(linestyle='-', linewidth=5, color = 'limegreen')
 
 # DICE
 fig, ax = plt.subplots(1,1)
-
-plt.boxplot(score0, positions = [1])
-plt.boxplot(score4, positions = [2])
-plt.boxplot(score8, positions = [3])
-plt.boxplot(score12, positions = [4])
-plt.boxplot(score16, positions = [5])
-plt.boxplot(score20, positions = [6])
-plt.boxplot(score24, positions = [7])
-plt.boxplot(score28, positions = [8])
-plt.boxplot(score32, positions = [9])
 fig.set_size_inches(26,18)
-title = 'Hausdorff distances for different number of fake images'
-fig.suptitle(title, fontsize=45, fontweight='bold')
 fig.tight_layout(pad=10.0)
 
+#plt.boxplot(ax = ax, boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score0, positions = [1], widths=(0.6), boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score4, positions = [2], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score8, positions = [3], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score12, positions = [4], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score16, positions = [5], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score20, positions = [6], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score24, positions = [7], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score28, positions = [8], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score32, positions = [9], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+
+title = 'DSC for different number of fake images'
+fig.suptitle(title, fontsize=45, fontweight='bold')
+
+plt.grid()
 
 xticks = ['0', '4', '8','12','16','20','24','28','32']
 ax.set_xticklabels(xticks)
@@ -106,12 +114,12 @@ labels = ax.get_xticklabels() + ax.get_yticklabels()
 ax.tick_params(axis='x', labelrotation=0, labelsize=35)
 ax.tick_params(axis='y', labelrotation=0, labelsize=40)
 
-ax.set_ylabel('Hausdorff distance', fontsize=40)
+ax.set_ylabel('DSC', fontsize=40)
 ax.set_xlabel('Number of fake images', fontsize=40)
 ax.yaxis.labelpad = 20
 ax.xaxis.labelpad = 20
 
-plt.savefig('HD_ML.png')
+plt.savefig('Dice_ML.png')
    
 median0 = st.median(score0)
 median4 = st.median(score4)
@@ -136,3 +144,5 @@ std28 = st.stdev(score28)
 std32 = st.stdev(score32)
 std = [std0, std4, std8, std12, std16, std20, std24, std28, std32]
 print(std)
+
+print(stats.wilcoxon(score0,score4))
