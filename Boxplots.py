@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import statistics as st
 
 score0 = []
-score = "DICE"
+score = "HD"
 with open("{x}_0.txt".format(x=score), "r") as f:
   for line in f:
       x = (line.strip())
@@ -32,11 +32,11 @@ with open("{x}_12.txt".format(x=score), "r") as f:
       x = line.strip()
       score12.append(float(x))
 
-# score16 = [] 
-# with open("{x}_16.txt".format(x=score), "r") as f:
-#   for line in f:
-#       x = line.strip()
-#       score16.append(float(x))
+score16 = [] 
+with open("{x}_16.txt".format(x=score), "r") as f:
+  for line in f:
+      x = line.strip()
+      score16.append(float(x))
 
 score20 = [] 
 with open("{x}_20.txt".format(x=score), "r") as f:
@@ -75,7 +75,7 @@ with open("{x}_32.txt".format(x=score), "r") as f:
 # score28 = list(filter(lambda num: num != 0, score8))
 # score32 = list(filter(lambda num: num != 0, score8))
     
-score16 = [0,0,0]
+# = [0,0,0]
 score24 = [0,0,0]
 
 
@@ -92,7 +92,7 @@ plt.boxplot(score24, positions = [7])
 plt.boxplot(score28, positions = [8])
 plt.boxplot(score32, positions = [9])
 fig.set_size_inches(26,18)
-title = 'Dice scores for different number of fake images'
+title = 'Hausdorff distances for different number of fake images'
 fig.suptitle(title, fontsize=45, fontweight='bold')
 fig.tight_layout(pad=10.0)
 
@@ -106,11 +106,13 @@ labels = ax.get_xticklabels() + ax.get_yticklabels()
 ax.tick_params(axis='x', labelrotation=0, labelsize=35)
 ax.tick_params(axis='y', labelrotation=0, labelsize=40)
 
-ax.set_ylabel('Dice score', fontsize=40)
+ax.set_ylabel('Hausdorff distance', fontsize=40)
 ax.set_xlabel('Number of fake images', fontsize=40)
 ax.yaxis.labelpad = 20
 ax.xaxis.labelpad = 20
-    
+
+plt.savefig('HD_ML.png')
+   
 median0 = st.median(score0)
 median4 = st.median(score4)
 median8 = st.median(score8)
@@ -120,5 +122,17 @@ median20 = st.median(score20)
 median24 = st.median(score24)
 median28 = st.median(score28)
 median32 = st.median(score32)
-medians = [median0, median4, median8, median12, median16, median20, median24, median28, median32]
-print(medians)
+median = [median0, median4, median8, median12, median16, median20, median24, median28, median32]
+print(median)
+
+std0 = st.stdev(score0)
+std4 = st.stdev(score4)
+std8 = st.stdev(score8)
+std12 = st.stdev(score12)
+std16 = st.stdev(score16)
+std20 = st.stdev(score20)
+std24 = st.stdev(score24)
+std28 = st.stdev(score28)
+std32 = st.stdev(score32)
+std = [std0, std4, std8, std12, std16, std20, std24, std28, std32]
+print(std)
