@@ -17,14 +17,14 @@ import seaborn as sns
 
 # Define paths
 
-experiment1 = 'Translation_seed1'
-experiment2 = 'TransAffine_seed1'
-experiment3 = 'TransRigid_seed1'
-experiment4 = 'TransBSpline_seed1'
-experiment5 = 'TransRigidBSpline_seed1'
-experiment6 = 'TransAffineBSpline_seed1'
+experiment1 = 'Translation'
+experiment2 = 'TransAffine'
+experiment3 = 'TransRigid'
+experiment4 = 'TransBSpline'
+experiment5 = 'TransRigidBSpline'
+experiment6 = 'TransAffineBSpline'
 
-path = 'D:\\CapitaSelecta\\results_registration_seed1'
+path = 'D:\\CapitaSelecta\\results_registration_seed0'
 
 exp_list = [experiment1, experiment2, experiment3, experiment4, experiment5, experiment6]
 df_dict = {}
@@ -163,3 +163,26 @@ save_path = os.path.join(path,'dice_p_values_Wilcox_split2.png')
 fig = ax.get_figure()
 fig.savefig(save_path, dpi=200)
 
+
+# =============================================================================
+# Even more visualisation! :D
+# =============================================================================
+
+
+df_haus.insert(0, 'Fixed patient', df_dict[experiment1]['fixed patient'])
+df_long = pd.melt(df_haus, "Fixed patient", var_name="Experiment", value_name="Hausdorff")
+a4_dims = (18, 8.27)
+fig, ax = plt.subplots(figsize=a4_dims)
+
+sns.factorplot("Experiment", hue="Fixed patient", y="Hausdorff", data=df_long, kind="box", ax=ax, width=0.5)
+fig.suptitle('Hausdorff distance scores for Registration for split 1', fontsize=20)
+ax.tick_params(axis='x', labelrotation=0, labelsize=15)
+ax.tick_params(axis='y', labelrotation=0, labelsize=15)
+ax.set_ylabel('Hausdorff', fontsize=15, fontweight='bold')
+ax.set_xlabel('Experiment', fontsize=15, fontweight='bold')
+plt.setp(ax.get_legend().get_texts(), fontsize='14') # for legend text
+plt.setp(ax.get_legend().get_title(), fontsize='14') # for legend title
+plt.show()
+
+save_path = os.path.join(path,'Overall_haus.png')
+fig.savefig(save_path, dpi=200)
