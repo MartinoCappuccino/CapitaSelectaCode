@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
 import scipy
+from skimage import metrics
 
 
 data_dir = r'C:\\Users\\20192024\\OneDrive - TU Eindhoven\\Documents\\Y4\\Q3\\Capita Selecta in Medical Image Analysis\\Project\\Nieuw\\'
@@ -60,5 +61,38 @@ for i, ax in enumerate(fig.axes):
 
 plt.show()
 fig.savefig(os.path.join(data_dir, 'results', experiment, val_patient, 'plot_contours.png'), dpi=200)
+
+
+# =============================================================================
+# Debugging HD
+# =============================================================================
+
+from scipy.spatial.distance import directed_hausdorff
+
+example_gt1 = gt[50,:,:]
+example_at1 = atlas1[50,:,:]
+
+example_gt2 = gt[60,:,:]
+example_at2 = atlas1[60,:,:]
+
+hausdorf_list = [directed_hausdorff(example_gt1, example_at1), directed_hausdorff(example_gt2, example_at2)]
+
+hausdorf = np.array(hausdorf_list)
+mean_hausdorf = hausdorf.mean()
+std_hausdorf = hausdorf.std()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

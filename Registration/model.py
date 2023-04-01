@@ -144,7 +144,7 @@ class Model():
 
                 hausdorf = []
                 for slice in range(segmentation.shape[0]):
-                    hausdorf.append(directed_hausdorff(segmentation[slice, :, :], ground_truth[slice, :, :]))
+                    hausdorf.append(directed_hausdorff(segmentation[slice, :, :], ground_truth[slice, :, :])[0])
                 hausdorf = np.array(hausdorf)
                 mean_hausdorf = hausdorf.mean()
                 std_hausdorf = hausdorf.std()
@@ -165,7 +165,7 @@ class Model():
             
             hausdorf = []
             for slice in range(staple.shape[0]):
-                hausdorf.append(directed_hausdorff(staple[slice, :, :], ground_truth[slice, :, :]))
+                hausdorf.append(directed_hausdorff(staple[slice, :, :], ground_truth[slice, :, :])[0])
             hausdorf = np.array(hausdorf)
             mean_hausdorf = hausdorf.mean()
             std_hausdorf = hausdorf.std()
