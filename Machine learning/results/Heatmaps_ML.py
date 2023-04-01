@@ -48,11 +48,11 @@ with open("{x}_20.txt".format(x=score), "r") as f:
       x = line.strip()
       score20.append(float(x))
 
-# score24 = [] 
-# with open("{x}_24.txt".format(x=score), "r") as f:
-#   for line in f:
-#       x = line.strip()
-#       score24.append(float(x))
+score24 = [] 
+with open("{x}_24.txt".format(x=score), "r") as f:
+   for line in f:
+       x = line.strip()
+       score24.append(float(x))
 
 score28 = [] 
 with open("{x}_28.txt".format(x=score), "r") as f:
@@ -67,11 +67,11 @@ with open("{x}_32.txt".format(x=score), "r") as f:
       score32.append(float(x))
 
 
-score24 = [0]*258
+#score24 = [0]*258
 
-scores = [score0, score4, score8, score12, score16, score20, score24, score28, score32]
-p_values = np.zeros((9,9))
-column_names = ['0', '4', '8','12','16','20','24','28','32']
+scores = [score0, score4, score8, score12, score16, score20, score24, score28]
+p_values = np.zeros((8,8))
+column_names = ['0', '4', '8','12','16','20','24','28']
 
 for i in range(len(column_names)):
       for j in range(len(column_names)):
@@ -83,7 +83,7 @@ for i in range(len(column_names)):
 #P_value = stats.wilcoxon(score0,score0)
 #print(P_value)
 ax = sns.heatmap(p_values, linewidth=0.5)
-ax.set_title(f'Heatmap of p-values per number of fake images - {score} scores')
+ax.set_title(f'Heatmap of p-values - Hausdorff distance')
 ax.set_xticklabels(column_names)
 ax.set_yticklabels(column_names)
 ax.tick_params(axis='x', labelrotation=0, labelsize=8.5)

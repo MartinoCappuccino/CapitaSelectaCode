@@ -10,7 +10,7 @@ from scipy import stats
 from pathlib import Path
 
 score0 = []
-score = "HD"
+score = "DICE"
 RESULT_PATH = Path(r"C:\Users\20182371\Documents\TUe\CapitaSelectaCode\Machine learning\results")
 with open(RESULT_PATH / "{x}_0.txt".format(x=score), "r") as f:
   for line in f:
@@ -93,21 +93,23 @@ fig.tight_layout(pad=10.0)
 
 #plt.boxplot(ax = ax, boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
 plt.boxplot(score0, positions = [1], widths=(0.6), boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
-plt.boxplot(score4, positions = [2], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
-plt.boxplot(score8, positions = [3], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
-plt.boxplot(score12, positions = [4], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
-plt.boxplot(score16, positions = [5], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
-plt.boxplot(score20, positions = [6], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
-plt.boxplot(score24, positions = [7], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
-plt.boxplot(score28, positions = [8], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
-plt.boxplot(score32, positions = [9], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score32, positions = [2], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score4, positions = [3], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score8, positions = [4], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score12, positions = [5], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score16, positions = [6], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score20, positions = [7], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score24, positions = [8], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
+plt.boxplot(score28, positions = [9], widths=(0.6),boxprops=boxprops, whiskerprops=whiskerprops, capprops=capprops, medianprops=medianprops)
 
-title = f'{score} for different number of fake images'
+ax.axvline(x=2.5, color='black', linestyle='--', linewidth=3)
+
+title = 'Hausdorff distance for different numbers of fake images'
 fig.suptitle(title, fontsize=45, fontweight='bold')
 
 plt.grid()
 
-xticks = ['0', '4', '8','12','16','20','24','28','32']
+xticks = ['0', '32', '4', '8','12','16','20','24','28']
 ax.set_xticklabels(xticks)
 
 labels = ax.get_xticklabels() + ax.get_yticklabels()
@@ -116,12 +118,12 @@ labels = ax.get_xticklabels() + ax.get_yticklabels()
 ax.tick_params(axis='x', labelrotation=0, labelsize=35)
 ax.tick_params(axis='y', labelrotation=0, labelsize=40)
 
-ax.set_ylabel('DSC', fontsize=40)
+ax.set_ylabel('Hausdorff distance', fontsize=40)
 ax.set_xlabel('Number of fake images', fontsize=40)
 ax.yaxis.labelpad = 20
 ax.xaxis.labelpad = 20
 
-plt.savefig(f'boxplot_{score}_ml.png')
+plt.savefig(RESULT_PATH / f'boxplot_{score}_ml_v2.png')
    
 median0 = st.median(score0)
 median4 = st.median(score4)
