@@ -156,8 +156,8 @@ class Model():
             staple = sitk.STAPLE(seg_stack, 1.0) 
             staple = sitk.GetArrayFromImage(staple)
             staple = (staple > self.threshold_staple).astype(np.int16)
-            
-            sitk.WriteImage(sitk.GetImageFromArray(staple), os.path.join(self.config.folder_results, self.config.now, self.config.patients[valid_i], 'Registration{x}.mhd'.format(x=valid_i)))
+            print(self.config.patients[valid_i])
+            sitk.WriteImage(sitk.GetImageFromArray(staple), os.path.join(self.config.folder_results, self.config.now, self.config.patients[valid_i], 'Registration{x}.mhd'.format(x=str(self.config.patients[valid_i]))))
             
             
             
