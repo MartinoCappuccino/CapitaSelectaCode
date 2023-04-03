@@ -49,10 +49,10 @@ class Model():
         for i, path in tqdm(list(enumerate(self.config.fullpaths_raw)), desc="Loading Data"):
             mr_bffe = sitk.ReadImage(os.path.join(path, "mr_bffe.mhd"))
             mr_bffe = sitk.GetArrayFromImage(mr_bffe).astype(np.float32)
-            prostaat = sitk.ReadImage(os.path.join(path, "prostaat.mhd"))
-            prostaat = sitk.GetArrayFromImage(prostaat).astype(np.float32)
+            #prostaat = sitk.ReadImage(os.path.join(path, "prostaat.mhd"))
+            #prostaat = sitk.GetArrayFromImage(prostaat).astype(np.float32)
             self.data[i,0] = mr_bffe
-            self.data[i,1] = prostaat
+            #self.data[i,1] = prostaat
 
     def preprocess_and_save(
         self,
@@ -77,9 +77,9 @@ class Model():
             mr_bffe = sitk.GetImageFromArray(self.data_preprocessed[i,0])
             mr_bffe = sitk.Cast(mr_bffe, sitk.sitkFloat32)
             sitk.WriteImage(mr_bffe, os.path.join(path, "mr_bffe.mhd"))
-            prostaat = sitk.GetImageFromArray(self.data_preprocessed[i,1])
-            prostaat = sitk.Cast(prostaat, sitk.sitkFloat32)
-            sitk.WriteImage(prostaat, os.path.join(path, "prostaat.mhd"))
+            #prostaat = sitk.GetImageFromArray(self.data_preprocessed[i,1])
+            #prostaat = sitk.Cast(prostaat, sitk.sitkFloat32)
+            #sitk.WriteImage(prostaat, os.path.join(path, "prostaat.mhd"))
 
     def register_and_segment(
         self,
