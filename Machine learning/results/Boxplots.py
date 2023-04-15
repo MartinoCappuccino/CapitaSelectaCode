@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 import statistics as st
 from scipy import stats
 from pathlib import Path
+import statistics
 
 score0 = []
-score = "DICE"
+score = "HD"
 RESULT_PATH = Path(r"C:\Users\20182371\Documents\TUe\CapitaSelectaCode\Machine learning\results")
 with open(RESULT_PATH / "{x}_0.txt".format(x=score), "r") as f:
   for line in f:
@@ -34,6 +35,7 @@ with open(RESULT_PATH /"{x}_12.txt".format(x=score), "r") as f:
   for line in f:
       x = line.strip()
       score12.append(float(x))
+print("score 12:", statistics.median(score12))
 
 score16 = [] 
 with open(RESULT_PATH /"{x}_16.txt".format(x=score), "r") as f:
@@ -46,6 +48,7 @@ with open(RESULT_PATH /"{x}_20.txt".format(x=score), "r") as f:
   for line in f:
       x = line.strip()
       score20.append(float(x))
+print("score 20:", statistics.median(score20))
 
 score24 = [] 
 with open(RESULT_PATH / "{x}_24.txt".format(x=score), "r") as f:
@@ -104,7 +107,7 @@ plt.boxplot(score28, positions = [9], widths=(0.6),boxprops=boxprops, whiskerpro
 
 ax.axvline(x=2.5, color='black', linestyle='--', linewidth=3)
 
-title = 'Hausdorff distance for different numbers of fake images'
+title = 'Dice score for different numbers of synthetic images'
 fig.suptitle(title, fontsize=45, fontweight='bold')
 
 plt.grid()
@@ -118,12 +121,12 @@ labels = ax.get_xticklabels() + ax.get_yticklabels()
 ax.tick_params(axis='x', labelrotation=0, labelsize=35)
 ax.tick_params(axis='y', labelrotation=0, labelsize=40)
 
-ax.set_ylabel('Hausdorff distance', fontsize=40)
-ax.set_xlabel('Number of fake images', fontsize=40)
+ax.set_ylabel('Dice score', fontsize=40)
+ax.set_xlabel('Number of synthetic images', fontsize=40)
 ax.yaxis.labelpad = 20
 ax.xaxis.labelpad = 20
 
-plt.savefig(RESULT_PATH / f'boxplot_{score}_ml_v2.png')
+plt.savefig(RESULT_PATH / f'boxplot_{score}_ml_v3.png')
    
 median0 = st.median(score0)
 median4 = st.median(score4)
